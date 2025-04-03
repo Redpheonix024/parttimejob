@@ -9,9 +9,16 @@ import MobileTabs from "@/components/dashboard/mobile-tabs"
 interface DashboardLayoutProps {
   children: React.ReactNode
   activeRoute: string
+  userData?: any
+  user?: any
 }
 
-export default function DashboardLayout({ children, activeRoute }: DashboardLayoutProps) {
+export default function DashboardLayout({ 
+  children, 
+  activeRoute,
+  userData, 
+  user,
+}: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeTab, setActiveTab] = useState(activeRoute)
 
@@ -26,7 +33,7 @@ export default function DashboardLayout({ children, activeRoute }: DashboardLayo
       <DashboardSidebar activeRoute={activeRoute} isOpen={sidebarOpen} />
 
       <div className="flex-1 min-w-0 overflow-auto">
-        <DashboardHeader toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        <DashboardHeader toggleSidebar={() => setSidebarOpen(!sidebarOpen)} userData={userData} user={user} />
 
         <main className="container mx-auto px-4 py-8">
           <MobileTabs activeTab={activeTab} onTabChange={handleTabChange} />

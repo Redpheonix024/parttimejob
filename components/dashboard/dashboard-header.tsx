@@ -8,10 +8,14 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 interface DashboardHeaderProps {
   toggleSidebar: () => void;
+  userData?: any; // Add userData prop
+  user?: any; // Add user prop for Google profile
 }
 
 export default function DashboardHeader({
   toggleSidebar,
+  userData,
+  user,
 }: DashboardHeaderProps) {
   return (
     <header className="bg-background border-b sticky top-0 z-10">
@@ -37,8 +41,14 @@ export default function DashboardHeader({
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary"></span>
           </Button>
           <Avatar className="h-8 w-8">
-            <AvatarImage src="/placeholder.svg?height=32&width=32" alt="User" />
-            <AvatarFallback>JD</AvatarFallback>
+            <AvatarImage 
+              src={userData?.photoURL || user?.photoURL || "/placeholder-user.jpg"} 
+              alt={userData?.firstName || user?.displayName || "User"} 
+              style={{ objectFit: "cover" }}
+            />
+            <AvatarFallback>
+              {userData?.firstName?.[0]?.toUpperCase() || user?.displayName?.[0] || ""}
+            </AvatarFallback>
           </Avatar>
         </div>
       </div>

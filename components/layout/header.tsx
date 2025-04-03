@@ -17,9 +17,14 @@ import { useRouter } from "next/navigation";
 interface HeaderProps {
   showNav?: boolean;
   activeLink?: string;
+  userData: any;
 }
 
-export default function Header({ showNav = true, activeLink }: HeaderProps) {
+export default function Header({
+  showNav = true,
+  activeLink,
+  userData,
+}: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
 
@@ -87,13 +92,20 @@ export default function Header({ showNav = true, activeLink }: HeaderProps) {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger>
-                <Avatar>
+                <Avatar className="h-8 w-8">
                   <AvatarImage
-                    src={user.photoURL || ""}
-                    alt={user.displayName || ""}
+                    src={
+                      userData?.photoURL ||
+                      user?.photoURL ||
+                      "/placeholder-user.jpg"
+                    }
+                    alt={userData?.firstName || user?.displayName || "User"}
+                    style={{ objectFit: "cover" }}
                   />
                   <AvatarFallback>
-                    {user.displayName?.[0] || user.email?.[0] || "U"}
+                    {userData?.firstName?.[0]?.toUpperCase() ||
+                      user?.displayName?.[0] ||
+                      ""}
                   </AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
@@ -102,7 +114,7 @@ export default function Header({ showNav = true, activeLink }: HeaderProps) {
                   <Link href="/dashboard">Dashboard</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/profile">Profile</Link>
+                  <Link href="/dashboard/profile">Profile</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>

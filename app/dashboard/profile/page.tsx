@@ -21,13 +21,22 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import DashboardLayout from "@/components/dashboard/dashboard-layout";
-import { Briefcase, GraduationCap, Upload } from "lucide-react";
+import {
+  Briefcase,
+  GraduationCap,
+  Upload,
+  Code,
+  CheckSquare,
+} from "lucide-react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { uploadToS3, deleteFromS3 } from "@/app/utils/aws-config";
 import { PhoneVerificationModal } from "@/components/phone-verification-modal";
 import { toast } from "sonner";
 import { getIndiaState, getIndiaDistrict } from "@/app/data/india-states";
+import { Skill, SkillCategory } from "@/types/user";
+import { AddSkillDialog } from "@/components/skills/add-skill-dialog";
+import { calculateProfileCompletion } from "@/app/utils/profile-completion";
 
 export default function Profile() {
   const [user, setUser] = useState<any>(null);
@@ -45,6 +54,7 @@ export default function Profile() {
     userData?.permanentAddress?.state || ""
   );
   const [districts, setDistricts] = useState<string[]>([]);
+  const [showAddSkill, setShowAddSkill] = useState(false);
 
   useEffect(() => {
     const auth = getAuth();
@@ -67,9 +77,10 @@ export default function Profile() {
       photoURL: user.photoURL || "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      phoneVerified: false,
-      workExperience: [],
-      education: [],
+      phoneVerified: false, // Explicit initialization
+      phone: "", // Add empty phone field
+      skills: [],
+      completedWorks: [],
     };
   };
 
@@ -129,6 +140,7 @@ export default function Profile() {
         phone: getValue("phone").startsWith("+91")
           ? getValue("phone")
           : "+91" + getValue("phone"),
+
         permanentAddress: {
           street: getValue("permanent-address", "textarea"),
           state: getValue("state", "select"),
@@ -243,12 +255,32 @@ export default function Profile() {
     setDistricts(stateCode ? getIndiaDistrict(stateCode) : []);
   };
 
+  const handleAddSkill = async (newSkill: Omit<Skill, "id">) => {
+    if (!user) return;
+    try {
+      const updatedSkills = [...(userData?.skills || []), newSkill];
+      await updateDoc(doc(db, "users", user.uid), {
+        skills: updatedSkills,
+        updatedAt: new Date().toISOString(),
+      });
+      setUserData({ ...userData, skills: updatedSkills });
+      toast.success("Skill added successfully");
+    } catch (error) {
+      console.error("Error adding skill:", error);
+      toast.error("Failed to add skill");
+    }
+  };
+
+  const profileCompletion = userData
+    ? calculateProfileCompletion(userData)
+    : { percentage: 0, sections: [] };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
 
   return (
-    <DashboardLayout activeRoute="profile">
+    <DashboardLayout activeRoute="profile" userData={userData} user={user}>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">My Profile</h1>
         <Button disabled={isSaving}>
@@ -288,10 +320,6 @@ export default function Profile() {
                     ? `${userData.firstName} ${userData.lastName}`
                     : user?.displayName || "Complete Your Profile"}
                 </h2>
-                <p className="text-sm text-muted-foreground mb-2">
-                  {userData?.title || "Add your title"}
-                </p>
-                <Badge>{userData?.availability || "Set Availability"}</Badge>
                 <Button
                   variant="outline"
                   size="sm"
@@ -328,11 +356,25 @@ export default function Profile() {
                 <p className="text-sm font-medium">Profile Completion</p>
                 <div className="h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-primary"
-                    style={{ width: "85%" }}
+                    className="h-full bg-primary transition-all duration-500"
+                    style={{ width: `${profileCompletion.percentage}%` }}
                   ></div>
                 </div>
-                <p className="text-xs text-muted-foreground text-right">85%</p>
+                <div className="flex justify-between items-center">
+                  <div className="text-xs text-muted-foreground">
+                    {profileCompletion.sections
+                      .filter((s) => !s.completed)
+                      .slice(0, 1)
+                      .map((section) => (
+                        <span key={section.name}>
+                          Next: Complete {section.nextField || section.name}
+                        </span>
+                      ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {profileCompletion.percentage}%
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -342,8 +384,8 @@ export default function Profile() {
           <Tabs defaultValue="personal">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="personal">Personal Info</TabsTrigger>
-              <TabsTrigger value="experience">Experience</TabsTrigger>
-              <TabsTrigger value="education">Education</TabsTrigger>
+              <TabsTrigger value="skills">Skills</TabsTrigger>
+              <TabsTrigger value="completed-works">Completed Works</TabsTrigger>
             </TabsList>
 
             <TabsContent value="personal" className="mt-6">
@@ -566,97 +608,122 @@ export default function Profile() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="experience" className="mt-6">
+            <TabsContent value="skills" className="mt-6">
               <Card>
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle>Work Experience</CardTitle>
-                      <CardDescription>Add your work history</CardDescription>
+                      <CardTitle>Skills</CardTitle>
+                      <CardDescription>
+                        Add your technical and professional skills
+                      </CardDescription>
                     </div>
-                    <Button size="sm">
-                      <Briefcase className="h-4 w-4 mr-2" />
-                      Add Experience
+                    <Button size="sm" onClick={() => setShowAddSkill(true)}>
+                      <Code className="h-4 w-4 mr-2" />
+                      Add Skill
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {userData?.workExperience?.map(
-                      (experience: any, index: number) => (
+                    {Object.values(SkillCategory).map((category) => {
+                      const categorySkills = userData?.skills?.filter(
+                        (skill: Skill) => skill.category === category
+                      );
+
+                      if (!categorySkills?.length) return null;
+
+                      return (
+                        <div key={category} className="space-y-4">
+                          <h3 className="font-medium text-lg">{category}</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {categorySkills.map(
+                              (skill: Skill, index: number) => (
+                                <div
+                                  key={index}
+                                  className="border rounded-lg p-4 space-y-2"
+                                >
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <h4 className="font-medium">
+                                        {skill.name}
+                                      </h4>
+                                      <div className="flex items-center space-x-2">
+                                        <Badge variant="secondary">
+                                          {skill.level}
+                                        </Badge>
+                                        {skill.yearsOfExperience && (
+                                          <span className="text-sm text-muted-foreground">
+                                            {skill.yearsOfExperience} years
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <Button variant="ghost" size="sm">
+                                      Edit
+                                    </Button>
+                                  </div>
+                                  {skill.description && (
+                                    <p className="text-sm text-muted-foreground">
+                                      {skill.description}
+                                    </p>
+                                  )}
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="completed-works" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>Completed Works</CardTitle>
+                      <CardDescription>
+                        Add your previously completed projects and works
+                      </CardDescription>
+                    </div>
+                    <Button size="sm">
+                      <CheckSquare className="h-4 w-4 mr-2" />
+                      Add Work
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {userData?.completedWorks?.map(
+                      (work: any, index: number) => (
                         <div
                           key={index}
                           className="border-b pb-6 last:border-0 last:pb-0"
                         >
                           <div className="flex justify-between items-start">
                             <div>
-                              <h3 className="font-medium">
-                                {experience.title}
-                              </h3>
+                              <h3 className="font-medium">{work.title}</h3>
                               <p className="text-sm text-muted-foreground">
-                                {experience.company}
+                                {work.client}
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                {experience.period}
+                                {work.completionDate}
                               </p>
                             </div>
                             <Button variant="ghost" size="sm">
                               Edit
                             </Button>
                           </div>
-                          <p className="text-sm mt-2">
-                            {experience.description}
-                          </p>
+                          {work.description && (
+                            <p className="text-sm mt-2">{work.description}</p>
+                          )}
                         </div>
                       )
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="education" className="mt-6">
-              <Card>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle>Education</CardTitle>
-                      <CardDescription>
-                        Add your educational background
-                      </CardDescription>
-                    </div>
-                    <Button size="sm">
-                      <GraduationCap className="h-4 w-4 mr-2" />
-                      Add Education
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {userData?.education?.map((edu: any, index: number) => (
-                      <div
-                        key={index}
-                        className="border-b pb-6 last:border-0 last:pb-0"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-medium">{edu.degree}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {edu.institution}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {edu.period}
-                            </p>
-                          </div>
-                          <Button variant="ghost" size="sm">
-                            Edit
-                          </Button>
-                        </div>
-                        {edu.description && (
-                          <p className="text-sm mt-2">{edu.description}</p>
-                        )}
-                      </div>
-                    ))}
                   </div>
                 </CardContent>
               </Card>
@@ -669,6 +736,11 @@ export default function Profile() {
         onClose={() => setShowPhoneVerification(false)}
         phone={phoneToVerify}
         onVerificationSuccess={handlePhoneVerificationSuccess}
+      />
+      <AddSkillDialog
+        isOpen={showAddSkill}
+        onClose={() => setShowAddSkill(false)}
+        onAdd={handleAddSkill}
       />
     </DashboardLayout>
   );

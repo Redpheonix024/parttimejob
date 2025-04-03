@@ -85,7 +85,7 @@ export default function AuthPage() {
       document.cookie = `auth=${token}; path=/; max-age=3600; secure; samesite=strict`;
 
       // Immediate redirect after successful login
-      router.push("/dashboard");
+      router.push("/");
     } catch (error: any) {
       setError(error.message);
       setIsLoading(false);
@@ -149,7 +149,7 @@ export default function AuthPage() {
       setShowSuccessDialog(true);
       setTimeout(() => {
         setShowSuccessDialog(false);
-        router.push("/dashboard");
+        router.push("/");
       }, 2000);
     } catch (error: any) {
       setError(error.message);
@@ -180,8 +180,24 @@ export default function AuthPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
 
-      // Check if user data exists and is complete
-      // await checkUserData(result.user.uid);
+      // Check if user already exists in Firestore
+      const userDoc = await getDoc(doc(db, "users", result.user.uid));
+
+      if (!userDoc.exists()) {
+        // If user doesn't exist, create new user document
+        const userData = {
+          firstName: result.user.displayName?.split(" ")[0] || "",
+          lastName:
+            result.user.displayName?.split(" ").slice(1).join(" ") || "",
+          email: result.user.email,
+          phone: result.user.phoneNumber || "",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          authProvider: "google",
+        };
+
+        await setDoc(doc(db, "users", result.user.uid), userData);
+      }
 
       setDialogMessage({
         title: "Welcome!",
@@ -190,11 +206,10 @@ export default function AuthPage() {
       setShowSuccessDialog(true);
       setTimeout(() => {
         setShowSuccessDialog(false);
-        router.push("/dashboard");
+        router.push("/");
       }, 2000);
     } catch (error: any) {
       setError(error.message);
-      // Sign out the user if validation fails
       if (auth.currentUser) {
         await auth.signOut();
       }

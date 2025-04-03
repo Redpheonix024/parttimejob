@@ -103,6 +103,67 @@
   padding: 0.5rem;
 }
 
+.dark .react-calendar {
+  background: hsl(222 47% 11%);
+  border: 1px solid hsl(217 33% 25%);
+  box-shadow: 0 8px 12px -4px rgb(0 0 0 / 0.3);
+  color: hsl(210 40% 98%);
+}
+
+.dark .react-calendar__tile {
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  position: relative;
+}
+
+.dark .react-calendar__tile:enabled:hover,
+.dark .react-calendar__tile:enabled:focus {
+  background-color: hsl(244 75% 67% / 0.15);
+  border-color: hsl(244 75% 67% / 0.5);
+}
+
+.dark .react-calendar__tile--active {
+  background: hsl(244 75% 67%) !important;
+  border-color: hsl(244 85% 77%);
+  box-shadow: 0 0 0 2px hsl(244 75% 67% / 0.3);
+}
+
+.dark .react-calendar__tile--now {
+  background: transparent;
+  border: 2px solid hsl(244 75% 67%);
+  font-weight: 600;
+}
+
+.dark .react-calendar__month-view__days__day--weekend {
+  color: hsl(0 84% 70%);
+}
+
+.dark .react-calendar__month-view__days__day--neighboring-month {
+  color: hsl(217 33% 35%);
+}
+
+.dark .react-calendar__navigation {
+  margin-bottom: 0.5rem;
+}
+
+.dark .react-calendar__navigation button {
+  transition: all 0.2s ease;
+  border-radius: 0.25rem;
+  min-width: 44px;
+  background: transparent;
+  padding: 0.5rem;
+}
+
+.dark .react-calendar__navigation button:disabled {
+  opacity: 0.4;
+}
+
+.dark .react-calendar__navigation button:enabled:hover,
+.dark .react-calendar__navigation button:enabled:focus {
+  background-color: hsl(244 75% 67% / 0.15);
+  border-color: hsl(244 75% 67% / 0.5);
+}
+
 .react-calendar__tile {
   padding: 0.75rem;
   border-radius: 0.25rem;
@@ -111,6 +172,11 @@
 .react-calendar__tile:enabled:hover,
 .react-calendar__tile:enabled:focus {
   background-color: #e2e8f0;
+}
+
+.dark .react-calendar__tile:enabled:hover,
+.dark .react-calendar__tile:enabled:focus {
+  background-color: hsl(222 47% 15%);
 }
 
 .react-calendar__tile--active {
@@ -122,12 +188,25 @@
   background: #dbeafe;
 }
 
+.dark .react-calendar__tile--now {
+  background: hsl(222 47% 15%);
+}
+
 .react-calendar__navigation button:enabled:hover,
 .react-calendar__navigation button:enabled:focus {
   background-color: #e2e8f0;
   border-radius: 0.25rem;
 }
 
+.dark .react-calendar__navigation button:enabled:hover,
+.dark .react-calendar__navigation button:enabled:focus {
+  background-color: hsl(222 47% 15%);
+}
+
 .react-calendar__month-view__days__day--weekend {
   color: #ef4444;
+}
+
+.dark .react-calendar {
+  color: white;
 }
