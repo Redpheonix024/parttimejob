@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge"
-import { Briefcase, Building, Calendar, Clock, DollarSign, MapPin } from "lucide-react"
+import { Briefcase, Building, Calendar, Clock, MapPin } from "lucide-react"
+import { RupeeIcon } from "@/components/ui/rupee-icon"
 import type { Job } from "@/types/job"
 
 interface JobDetailCardProps {
@@ -27,7 +28,7 @@ export default function JobDetailCard({ job }: JobDetailCardProps) {
         <span>{job.hours}</span>
       </div>
       <div className="flex items-center text-sm">
-        <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
+        <RupeeIcon className="h-4 w-4 mr-2 text-muted-foreground" />
         <span>{job.rate}</span>
       </div>
       <div className="flex items-center text-sm">

@@ -1,7 +1,10 @@
+"use client";
+
 import type React from "react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   Calendar,
   FileText,
@@ -15,17 +18,41 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getAuth, signOut } from "firebase/auth";
+import { useState, useEffect } from "react";
 
 interface DashboardSidebarProps {
   activeRoute: string;
   isOpen?: boolean;
+  mobileOpen?: boolean; 
+  setMobileOpen?: (open: boolean) => void;
 }
 
 export default function DashboardSidebar({
   activeRoute,
   isOpen = true,
+  mobileOpen = false,
+  setMobileOpen = () => {},
 }: DashboardSidebarProps) {
   const router = useRouter();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Check if the window is available (client-side)
+    if (typeof window !== 'undefined') {
+      const checkMobile = () => {
+        setIsMobile(window.innerWidth < 768);
+      };
+      
+      // Initial check
+      checkMobile();
+      
+      // Add event listener for window resize
+      window.addEventListener('resize', checkMobile);
+      
+      // Clean up event listener
+      return () => window.removeEventListener('resize', checkMobile);
+    }
+  }, []);
 
   const handleLogout = async () => {
     const auth = getAuth();
@@ -37,12 +64,8 @@ export default function DashboardSidebar({
     }
   };
 
-  return (
-    <div
-      className={`hidden md:flex flex-col bg-card border-r h-screen sticky top-0 transition-all duration-300 ${
-        isOpen ? "w-64" : "w-20"
-      }`}
-    >
+  const sidebarContent = (
+    <>
       <div className="p-4 border-b">
         <Link
           href="/"
@@ -147,6 +170,30 @@ export default function DashboardSidebar({
           )}
         </div>
       </div>
+    </>
+  );
+
+  // For mobile view, use Sheet
+  if (isMobile) {
+    return (
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" className="p-0 w-[280px]">
+          <div className="flex flex-col h-full">
+            {sidebarContent}
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  // For desktop view, use the regular sidebar
+  return (
+    <div
+      className={`hidden md:flex flex-col bg-card border-r h-screen sticky top-0 transition-all duration-300 ${
+        isOpen ? "w-64" : "w-20"
+      }`}
+    >
+      {sidebarContent}
     </div>
   );
 }

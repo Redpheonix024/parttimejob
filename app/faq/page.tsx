@@ -264,7 +264,7 @@ const generalFaqs = [
   {
     question: "Is Parttimejob free to use?",
     answer:
-      "Parttimejob is free for job seekers to create profiles, search for jobs, and apply to positions. For employers, we offer various subscription plans starting at $49 per month, as well as pay-per-post options. You can find more details on our Pricing page.",
+      "Parttimejob is free for job seekers to create profiles, search for jobs, and apply to positions. For employers, we offer various subscription plans starting at ₹3675 per month, as well as pay-per-post options. You can find more details on our Pricing page.",
   },
   {
     question: "How do I contact customer support?",
@@ -315,7 +315,7 @@ const employerFaqs = [
   {
     question: "How much does it cost to post a job?",
     answer:
-      "The cost depends on your subscription plan. We offer plans starting at $49 per month for a single job posting. You can also purchase individual job postings without a subscription. Visit our Pricing page for detailed information on our plans and features.",
+      "The cost depends on your subscription plan. We offer plans starting at ₹3675 per month for a single job posting. You can also purchase individual job postings without a subscription. Visit our Pricing page for detailed information on our plans and features.",
   },
   {
     question: "How do I find the right candidates?",

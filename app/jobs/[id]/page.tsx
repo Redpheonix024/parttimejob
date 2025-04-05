@@ -122,7 +122,7 @@ const jobData = {
   company: "Coffee House",
   location: "San Francisco, CA",
   hours: "10-15 hours/week",
-  rate: "$18-22/hour",
+  rate: "₹1350-1650/hour",
   duration: "3 months",
   type: "part-time",
   postedDate: "2 days ago",

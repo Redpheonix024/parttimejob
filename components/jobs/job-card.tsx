@@ -2,7 +2,8 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Briefcase, Clock, DollarSign, MapPin } from "lucide-react"
+import { Briefcase, Clock, MapPin } from "lucide-react"
+import { RupeeIcon } from "@/components/ui/rupee-icon"
 import type { Job } from "@/types/job"
 
 interface JobCardProps {
@@ -37,7 +38,7 @@ export default function JobCard({ job }: JobCardProps) {
               <span>{job.hours}</span>
             </div>
             <div className="flex items-center text-sm">
-              <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
+              <RupeeIcon className="h-4 w-4 mr-2 text-muted-foreground" />
               <span>{job.rate}</span>
             </div>
             <div className="flex items-center text-sm">

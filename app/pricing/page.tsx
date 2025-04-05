@@ -91,7 +91,7 @@ export default function Pricing() {
                         <CardDescription>{plan.description}</CardDescription>
                         <div className="mt-4">
                           <span className="text-3xl font-bold">
-                            ${plan.price}
+                            ₹{plan.price}
                           </span>
                           <span className="text-muted-foreground ml-1">
                             /month
@@ -153,13 +153,13 @@ export default function Pricing() {
                         <CardDescription>{plan.description}</CardDescription>
                         <div className="mt-4">
                           <span className="text-3xl font-bold">
-                            ${plan.price}
+                            ₹{plan.price}
                           </span>
                           <span className="text-muted-foreground ml-1">
                             /month
                           </span>
                           <div className="text-sm text-primary font-medium mt-1">
-                            Billed annually (${plan.annualPrice}/year)
+                            Billed annually (₹{plan.annualPrice}/year)
                           </div>
                         </div>
                       </CardHeader>
@@ -363,7 +363,7 @@ const monthlyPlans = [
   {
     name: "Basic",
     description: "For occasional hiring needs",
-    price: 49,
+    price: 3675,
     features: [
       "1 active job posting",
       "30 days visibility",
@@ -381,7 +381,7 @@ const monthlyPlans = [
   {
     name: "Professional",
     description: "For growing businesses",
-    price: 99,
+    price: 7425,
     features: [
       "3 active job postings",
       "45 days visibility",
@@ -397,7 +397,7 @@ const monthlyPlans = [
   {
     name: "Business",
     description: "For high-volume hiring",
-    price: 199,
+    price: 14925,
     features: [
       "10 active job postings",
       "60 days visibility",
@@ -417,8 +417,8 @@ const annualPlans = [
   {
     name: "Basic",
     description: "For occasional hiring needs",
-    price: 39,
-    annualPrice: 468,
+    price: 2925,
+    annualPrice: 35100,
     features: [
       "1 active job posting",
       "30 days visibility",
@@ -436,8 +436,8 @@ const annualPlans = [
   {
     name: "Professional",
     description: "For growing businesses",
-    price: 79,
-    annualPrice: 948,
+    price: 5925,
+    annualPrice: 71100,
     features: [
       "3 active job postings",
       "45 days visibility",
@@ -453,8 +453,8 @@ const annualPlans = [
   {
     name: "Business",
     description: "For high-volume hiring",
-    price: 159,
-    annualPrice: 1908,
+    price: 11925,
+    annualPrice: 143100,
     features: [
       "10 active job postings",
       "60 days visibility",

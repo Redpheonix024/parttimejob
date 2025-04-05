@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import DashboardSidebar from "@/components/dashboard/dashboard-sidebar"
 import DashboardHeader from "@/components/dashboard/dashboard-header"
 import MobileTabs from "@/components/dashboard/mobile-tabs"
@@ -20,7 +20,14 @@ export default function DashboardLayout({
   user,
 }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [activeTab, setActiveTab] = useState(activeRoute)
+  const [refreshKey, setRefreshKey] = useState(Date.now());
+  
+  // Force a refresh of the header when profile picture changes
+  useEffect(() => {
+    setRefreshKey(Date.now());
+  }, [userData?.profilePicture, userData?.photoURL]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value)
@@ -28,12 +35,32 @@ export default function DashboardLayout({
     window.location.href = value === "overview" ? "/dashboard" : `/dashboard/${value}`
   }
 
+  const toggleSidebar = () => {
+    // For mobile, toggle the mobile sidebar
+    if (window.innerWidth < 768) {
+      setMobileSidebarOpen(!mobileSidebarOpen)
+    } else {
+      // For desktop, toggle the regular sidebar
+      setSidebarOpen(!sidebarOpen)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background flex">
-      <DashboardSidebar activeRoute={activeRoute} isOpen={sidebarOpen} />
+      <DashboardSidebar 
+        activeRoute={activeRoute} 
+        isOpen={sidebarOpen} 
+        mobileOpen={mobileSidebarOpen}
+        setMobileOpen={setMobileSidebarOpen}
+      />
 
       <div className="flex-1 min-w-0 overflow-auto">
-        <DashboardHeader toggleSidebar={() => setSidebarOpen(!sidebarOpen)} userData={userData} user={user} />
+        <DashboardHeader 
+          key={refreshKey}
+          toggleSidebar={toggleSidebar} 
+          userData={userData} 
+          user={user} 
+        />
 
         <main className="container mx-auto px-4 py-8">
           <MobileTabs activeTab={activeTab} onTabChange={handleTabChange} />

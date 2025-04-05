@@ -29,10 +29,14 @@ export const uploadToS3 = async (file: File, key: string) => {
   try {
     console.log("Starting upload:", { key, type: file.type, size: file.size });
 
+    // Convert File to ArrayBuffer instead of using it directly
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
     const command = new PutObjectCommand({
       Bucket: process.env.NEXT_PUBLIC_AWS_BUCKET_NAME!,
       Key: key,
-      Body: file,
+      Body: buffer, // Use buffer instead of file directly
       ContentType: file.type,
       ACL: "public-read",
     });

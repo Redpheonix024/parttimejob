@@ -37,6 +37,11 @@ import { getIndiaState, getIndiaDistrict } from "@/app/data/india-states";
 import { Skill, SkillCategory } from "@/types/user";
 import { AddSkillDialog } from "@/components/skills/add-skill-dialog";
 import { calculateProfileCompletion } from "@/app/utils/profile-completion";
+import { Progress } from "@/components/ui/progress";
+import { Upload as AWSUpload } from "@aws-sdk/lib-storage";
+import { s3Client } from "@/app/utils/aws-config";
+import { Progress as AWSUploadProgress } from "@aws-sdk/lib-storage";
+import { ProfileCompletionDialog } from "@/components/profile/profile-completion-dialog";
 
 export default function Profile() {
   const [user, setUser] = useState<any>(null);
@@ -44,11 +49,13 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [imageKey, setImageKey] = useState(0);
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showPhoneVerification, setShowPhoneVerification] = useState(false);
   const [phoneToVerify, setPhoneToVerify] = useState("");
+  const [showProfileCompletionDialog, setShowProfileCompletionDialog] = useState(false);
   const states = getIndiaState();
   const [selectedState, setSelectedState] = useState(
     userData?.permanentAddress?.state || ""
@@ -184,6 +191,7 @@ export default function Profile() {
     }
 
     setIsUploadingPhoto(true);
+    setUploadProgress(0);
     try {
       const loadingToast = toast.loading("Uploading photo...");
       const buffer = Buffer.from(await file.arrayBuffer());
@@ -197,18 +205,44 @@ export default function Profile() {
         }
       }
 
-      const photoURL = await uploadToS3(buffer, newKey, file.type);
+      // Create a File object from the buffer
+      const fileObj = new File([buffer], newKey, { type: file.type });
+      
+      // Upload with progress tracking
+      const upload = new AWSUpload({
+        client: s3Client,
+        params: {
+          Bucket: process.env.NEXT_PUBLIC_AWS_BUCKET_NAME!,
+          Key: newKey,
+          Body: fileObj,
+          ContentType: file.type,
+          ACL: "public-read",
+        },
+      });
+
+      upload.on("httpUploadProgress", (progress: { loaded?: number; total?: number }) => {
+        if (progress.total && progress.loaded) {
+          const percent = Math.round((progress.loaded / progress.total) * 100);
+          setUploadProgress(percent);
+        }
+      });
+
+      await upload.done();
+      const photoURL = `https://${process.env.NEXT_PUBLIC_AWS_BUCKET_NAME}.s3.ap-south-1.amazonaws.com/${newKey}`;
+
       if (!photoURL) throw new Error("Failed to get photo URL");
 
       const userDocRef = doc(db, "users", user.uid);
       await updateDoc(userDocRef, {
         photoURL,
+        profilePicture: photoURL,
         updatedAt: new Date().toISOString(),
       });
 
-      setUserData((prev) => ({
+      setUserData((prev: any) => ({
         ...prev,
         photoURL,
+        profilePicture: photoURL,
         updatedAt: new Date().toISOString(),
       }));
 
@@ -220,6 +254,7 @@ export default function Profile() {
       toast.error("Failed to update profile photo");
     } finally {
       setIsUploadingPhoto(false);
+      setUploadProgress(0);
     }
   };
 
@@ -274,6 +309,13 @@ export default function Profile() {
   const profileCompletion = userData
     ? calculateProfileCompletion(userData)
     : { percentage: 0, sections: [] };
+
+  // Show dialog when profile completion reaches 100%
+  useEffect(() => {
+    if (profileCompletion.percentage === 100) {
+      setShowProfileCompletionDialog(true);
+    }
+  }, [profileCompletion.percentage]);
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -331,7 +373,7 @@ export default function Profile() {
                 >
                   {isUploadingPhoto ? (
                     <>
-                      <span className="animate-spin mr-2">◌</span>
+                      <Upload className="h-4 w-4 mr-2" />
                       Uploading...
                     </>
                   ) : (
@@ -341,6 +383,14 @@ export default function Profile() {
                     </>
                   )}
                 </Button>
+                {isUploadingPhoto && (
+                  <div className="w-full mt-2">
+                    <Progress value={uploadProgress} className="h-2" />
+                    <p className="text-xs text-muted-foreground text-center mt-1">
+                      {uploadProgress}% uploaded
+                    </p>
+                  </div>
+                )}
                 <input
                   id="photo-upload"
                   type="file"
@@ -741,6 +791,10 @@ export default function Profile() {
         isOpen={showAddSkill}
         onClose={() => setShowAddSkill(false)}
         onAdd={handleAddSkill}
+      />
+      <ProfileCompletionDialog
+        isOpen={showProfileCompletionDialog}
+        onClose={() => setShowProfileCompletionDialog(false)}
       />
     </DashboardLayout>
   );

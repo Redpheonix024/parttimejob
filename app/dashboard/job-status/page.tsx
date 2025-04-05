@@ -8,7 +8,8 @@ import JobStatusCard from "@/components/dashboard/job-status-card"
 import JobTimeline from "@/components/dashboard/job-timeline"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
-import { Briefcase, Calendar, Clock, DollarSign, MapPin, Star } from "lucide-react"
+import { Briefcase, Calendar, Clock, MapPin, Star } from "lucide-react"
+import { RupeeIcon } from "@/components/ui/rupee-icon"
 import type { JobStatus } from "@/types/job"
 
 export default function JobStatusPage() {
@@ -82,7 +83,7 @@ export default function JobStatusPage() {
                       <span>{selectedJob.location}</span>
                     </div>
                     <div className="flex items-center">
-                      <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <RupeeIcon className="h-4 w-4 mr-2 text-muted-foreground" />
                       <span>{selectedJob.rate}</span>
                     </div>
                     <div className="flex items-center">
@@ -109,7 +110,7 @@ export default function JobStatusPage() {
                       <h3 className="text-sm font-medium mb-3">Payment Details</h3>
                       <div className="space-y-3">
                         <div className="flex items-center">
-                          <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
+                          <RupeeIcon className="h-4 w-4 mr-2 text-muted-foreground" />
                           <span>Amount: {selectedJob.paymentAmount}</span>
                         </div>
                         {selectedJob.paymentDate && (
@@ -178,7 +179,7 @@ const allJobs: JobStatus[] = [
     company: "Coffee House",
     location: "San Francisco, CA",
     hours: "10-15 hours/week",
-    rate: "$18-22/hour",
+    rate: "₹1350-1650/hour",
     duration: "3 months",
     type: "Part-time",
     appliedDate: "May 10, 2023",
@@ -191,7 +192,7 @@ const allJobs: JobStatus[] = [
     company: "EventPro Agency",
     location: "Remote",
     hours: "Flexible hours",
-    rate: "$25-35/hour",
+    rate: "₹1875-2625/hour",
     duration: "One-time event",
     type: "Contract",
     appliedDate: "May 5, 2023",
@@ -204,7 +205,7 @@ const allJobs: JobStatus[] = [
     title: "Social Media Assistant",
     company: "Digital Marketing Co.",
     location: "Remote",
-    rate: "$20-25/hour",
+    rate: "₹1500-1875/hour",
     hours: "15-20 hours/week",
     duration: "6 months",
     type: "Part-time",
@@ -219,7 +220,7 @@ const allJobs: JobStatus[] = [
     title: "Web Developer",
     company: "Tech Solutions Inc.",
     location: "Remote",
-    rate: "$30-40/hour",
+    rate: "₹2250-3000/hour",
     hours: "20-30 hours/week",
     duration: "Contract",
     type: "Contract",
@@ -229,7 +230,7 @@ const allJobs: JobStatus[] = [
     endDate: "May 5, 2023",
     status: "completed",
     paymentStatus: "pending",
-    paymentAmount: "$1,200",
+    paymentAmount: "₹90,000",
     postedDate: "April 10, 2023",
   },
   {
@@ -237,7 +238,7 @@ const allJobs: JobStatus[] = [
     title: "Data Entry Specialist",
     company: "Business Services",
     location: "Remote",
-    rate: "$18-22/hour",
+    rate: "₹1350-1650/hour",
     hours: "10-15 hours/week",
     duration: "Temporary",
     type: "Temporary",
@@ -247,7 +248,7 @@ const allJobs: JobStatus[] = [
     endDate: "April 20, 2023",
     status: "paid",
     paymentStatus: "paid",
-    paymentAmount: "$650",
+    paymentAmount: "₹48,750",
     paymentDate: "April 25, 2023",
     rating: 5,
     postedDate: "March 28, 2023",
@@ -257,7 +258,7 @@ const allJobs: JobStatus[] = [
     title: "Customer Support",
     company: "Service Pro",
     location: "Austin, TX",
-    rate: "$18-22/hour",
+    rate: "₹1350-1650/hour",
     hours: "Weekend shifts",
     duration: "Ongoing",
     type: "Weekend",
@@ -267,7 +268,7 @@ const allJobs: JobStatus[] = [
     endDate: "April 10, 2023",
     status: "paid",
     paymentStatus: "paid",
-    paymentAmount: "$800",
+    paymentAmount: "₹60,000",
     paymentDate: "April 15, 2023",
     rating: 4,
     postedDate: "March 10, 2023",

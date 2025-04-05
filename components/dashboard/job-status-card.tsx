@@ -3,7 +3,8 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, Clock, DollarSign, MapPin, Star } from "lucide-react"
+import { Calendar, Clock, MapPin, Star } from "lucide-react"
+import { RupeeIcon } from "@/components/ui/rupee-icon"
 
 interface JobStatusCardProps {
   job: {
@@ -42,7 +43,7 @@ export default function JobStatusCard({ job, onViewDetails }: JobStatusCardProps
             <span>{job.location}</span>
           </div>
           <div className="flex items-center">
-            <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
+            <RupeeIcon className="h-4 w-4 mr-2 text-muted-foreground" />
             <span>{job.rate}</span>
           </div>
           {job.startDate && (
@@ -69,7 +70,7 @@ export default function JobStatusCard({ job, onViewDetails }: JobStatusCardProps
             </div>
             {job.paymentAmount && (
               <div className="flex items-center">
-                <DollarSign className="h-4 w-4 mr-1 text-muted-foreground" />
+                <RupeeIcon className="h-4 w-4 mr-1 text-muted-foreground" />
                 <span className="text-sm">{job.paymentAmount}</span>
               </div>
             )}

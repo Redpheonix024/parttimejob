@@ -8,10 +8,9 @@ import {
   Briefcase,
   CheckCircle2,
   Clock,
-  DollarSign,
-  Search,
   UserPlus,
 } from "lucide-react";
+import { RupeeIcon } from "@/components/ui/rupee-icon"
 
 export default function HowItWorks() {
   return (
@@ -272,7 +271,7 @@ export default function HowItWorks() {
                     <CardContent className="pt-6">
                       <div className="mb-4 flex items-center justify-center">
                         <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                          <DollarSign className="h-6 w-6 text-primary" />
+                          <RupeeIcon className="h-6 w-6 text-primary" />
                         </div>
                       </div>
                       <h4 className="text-xl font-semibold text-center mb-2">

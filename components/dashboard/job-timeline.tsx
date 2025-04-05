@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle2, Clock, DollarSign, FileText, Briefcase } from "lucide-react"
+import { CheckCircle2, Clock, FileText, Briefcase } from "lucide-react"
+import { RupeeIcon } from "@/components/ui/rupee-icon"
 
 interface JobTimelineProps {
   status: "applied" | "approved" | "in-progress" | "completed" | "paid"
@@ -45,7 +46,7 @@ export default function JobTimeline({ status, dates }: JobTimelineProps) {
     {
       key: "paid",
       label: "Payment Received",
-      icon: <DollarSign className="h-5 w-5" />,
+      icon: <RupeeIcon className="h-5 w-5" />,
       date: dates?.paid,
       completed: ["paid"].includes(status),
     },

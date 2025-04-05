@@ -1,7 +1,9 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Clock, DollarSign, MapPin } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Clock, MapPin } from "lucide-react"
+import { RupeeIcon } from "@/components/ui/rupee-icon"
 
 interface JobCardProps {
   job: {
@@ -35,7 +37,7 @@ export default function JobCard({
           <span>{job.location}</span>
         </div>
         <div className="flex items-center text-xs text-muted-foreground">
-          <DollarSign className="h-3 w-3 mr-1" />
+          <RupeeIcon className="h-3 w-3 mr-1" />
           <span>{job.salary}</span>
         </div>
         <div className="flex items-center text-xs text-muted-foreground">

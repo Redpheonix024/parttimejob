@@ -22,6 +22,7 @@ import {
   PieChart,
   Users,
 } from "lucide-react"
+import { RupeeIcon } from "@/components/ui/rupee-icon"
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -85,10 +86,10 @@ export default function AdminDashboard() {
             />
             <StatCard
               title="Revenue"
-              value="$12,450"
+              value="₹933,750"
               change="-2.4%"
               trend="down"
-              icon={<DollarSign className="h-5 w-5 text-primary" />}
+              icon={<RupeeIcon className="h-5 w-5 text-primary" />}
             />
           </div>
 
@@ -223,9 +224,9 @@ export default function AdminDashboard() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-medium">Monthly Revenue</p>
-                          <p className="text-2xl font-bold">$4,285</p>
+                          <p className="text-2xl font-bold">₹321,375</p>
                         </div>
-                        <DollarSign className="h-10 w-10 text-primary opacity-80" />
+                        <RupeeIcon className="h-10 w-10 text-primary opacity-80" />
                       </div>
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
@@ -327,7 +328,7 @@ function getActivityIcon(type: string) {
     case "Job":
       return <Briefcase className="h-5 w-5" />
     case "Payment":
-      return <DollarSign className="h-5 w-5" />
+      return <RupeeIcon className="h-5 w-5" />
     case "System":
       return <BarChart3 className="h-5 w-5" />
     default:

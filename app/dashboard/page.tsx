@@ -10,32 +10,77 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Star } from "lucide-react";
+import { Star, Camera } from "lucide-react";
 import DashboardLayout from "@/components/dashboard/dashboard-layout";
 import StatCard from "@/components/dashboard/stat-card";
 import ApplicationCard from "@/components/dashboard/application-card";
 import InterviewCard from "@/components/dashboard/interview-card";
 import JobCard from "@/components/dashboard/job-card";
-import { useState, useEffect } from "react";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { useState, useEffect, useRef } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { usersApi } from "@/utils/api";
+import { toast } from "sonner";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
-  const [user, setUser] = useState<any>(null);
+  const { user } = useAuth();
+  const { profile, getProfilePicture, updateProfilePicture } = useUserProfile();
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
 
-  useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUser(user);
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !user?.uid) return;
+
+    const file = files[0];
+    
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    
+    // Check file size (limit to 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size exceeds 5MB limit');
+      return;
+    }
+
+    // Upload the file
+    try {
+      setIsUploading(true);
+      const response = await usersApi.uploadProfilePicture(file, user.uid);
+      
+      if (response.success) {
+        await updateProfilePicture(response.imageUrl);
+        toast.success('Profile picture updated successfully');
       }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload profile picture');
+    } finally {
+      setIsUploading(false);
+      // Reset the input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+  
   return (
-    <DashboardLayout activeRoute="overview">
+    <DashboardLayout activeRoute="overview" userData={profile} user={user}>
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileChange} 
+        className="hidden" 
+        accept="image/*"
+      />
       <div className="space-y-6">
         <h2 className="text-3xl font-semibold text-primary">
           Welcome back, {user?.displayName || "User"}!
@@ -108,17 +153,25 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center mb-4">
-                  <Avatar className="h-16 w-16">
-                    <AvatarImage
-                      src={
-                        user?.photoURL || "/placeholder.svg?height=64&width=64"
-                      }
-                      alt={user?.displayName || "User"}
-                    />
-                    <AvatarFallback>
-                      {user?.displayName?.[0] || "U"}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="relative group">
+                    <Avatar className="h-16 w-16">
+                      <AvatarImage
+                        src={profile?.profilePicture || profile?.photoURL || getProfilePicture()}
+                        alt={user?.displayName || "User"}
+                      />
+                      <AvatarFallback>
+                        {user?.displayName?.[0] || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <button 
+                      className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 cursor-pointer"
+                      onClick={handleFileSelect}
+                      disabled={isUploading}
+                      type="button"
+                    >
+                      <Camera className="h-3 w-3" />
+                    </button>
+                  </div>
                   <div className="ml-4">
                     <h3 className="font-medium">
                       {user?.displayName || "Complete Your Profile"}
@@ -250,21 +303,21 @@ const recommendedJobs = [
     title: "JavaScript Developer",
     company: "Tech Innovations",
     location: "Remote",
-    salary: "$30-40/hr",
+    salary: "₹2250-3000/hr",
     type: "Part-time",
   },
   {
     title: "Web Designer",
     company: "Design Studio",
     location: "San Francisco, CA",
-    salary: "$25-35/hr",
+    salary: "₹1875-2625/hr",
     type: "Contract",
   },
   {
     title: "Frontend Engineer",
     company: "Software Solutions",
     location: "New York, NY",
-    salary: "$40-50/hr",
+    salary: "₹3000-3750/hr",
     type: "Part-time",
   },
 ];
@@ -274,7 +327,7 @@ const allApplications = [
     jobTitle: "Frontend Developer",
     company: "Tech Solutions Inc.",
     location: "Remote",
-    salary: "$30-40/hr",
+    salary: "₹2250-3000/hr",
     type: "Part-time",
     appliedDate: "2 days ago",
     status: "Pending",
@@ -283,7 +336,7 @@ const allApplications = [
     jobTitle: "UX Designer",
     company: "Creative Agency",
     location: "San Francisco, CA",
-    salary: "$35-45/hr",
+    salary: "₹1875-2625/hr",
     type: "Contract",
     appliedDate: "1 week ago",
     status: "Interview",
@@ -292,7 +345,7 @@ const allApplications = [
     jobTitle: "Content Writer",
     company: "Media Group",
     location: "Chicago, IL",
-    salary: "$25-30/hr",
+    salary: "₹1500-1875/hr",
     type: "Part-time",
     appliedDate: "3 days ago",
     status: "Reviewed",
@@ -301,7 +354,7 @@ const allApplications = [
     jobTitle: "Social Media Manager",
     company: "Marketing Solutions",
     location: "Remote",
-    salary: "$20-25/hr",
+    salary: "₹1350-1650/hr",
     type: "Part-time",
     appliedDate: "2 weeks ago",
     status: "Rejected",
@@ -310,7 +363,7 @@ const allApplications = [
     jobTitle: "Customer Support",
     company: "Service Pro",
     location: "Austin, TX",
-    salary: "$18-22/hr",
+    salary: "₹1875-2250/hr",
     type: "Weekend",
     appliedDate: "5 days ago",
     status: "Pending",
@@ -322,7 +375,7 @@ const savedJobs: Job[] = [
     title: "JavaScript Developer",
     company: "Tech Innovations",
     location: "Remote",
-    salary: "$30-40/hr",
+    salary: "₹2250-3000/hr",
     type: "Part-time",
     postedDate: "3 days ago",
   },
@@ -330,7 +383,7 @@ const savedJobs: Job[] = [
     title: "Web Designer",
     company: "Design Studio",
     location: "San Francisco, CA",
-    salary: "$25-35/hr",
+    salary: "₹1875-2625/hr",
     type: "Contract",
     postedDate: "1 week ago",
   },
@@ -338,7 +391,7 @@ const savedJobs: Job[] = [
     title: "Frontend Engineer",
     company: "Software Solutions",
     location: "New York, NY",
-    salary: "$40-50/hr",
+    salary: "₹3000-3750/hr",
     type: "Part-time",
     postedDate: "2 days ago",
   },
@@ -346,7 +399,7 @@ const savedJobs: Job[] = [
     title: "Data Entry Specialist",
     company: "Business Services",
     location: "Remote",
-    salary: "$18-22/hr",
+    salary: "₹1875-2250/hr",
     type: "Flexible hours",
     postedDate: "Just now",
   },

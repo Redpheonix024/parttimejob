@@ -13,17 +13,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
+import { Menu } from "lucide-react";
 
 interface HeaderProps {
   showNav?: boolean;
   activeLink?: string;
   userData: any;
+  toggleMobileSidebar?: () => void;
 }
 
 export default function Header({
   showNav = true,
   activeLink,
   userData,
+  toggleMobileSidebar,
 }: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
@@ -47,9 +50,22 @@ export default function Header({
   return (
     <header className="bg-background border-b">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <Link href="/" className="text-2xl font-bold text-primary">
-          Parttimejob
-        </Link>
+        <div className="flex items-center">
+          {user && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="mr-2 md:hidden" 
+              onClick={toggleMobileSidebar}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
+          <Link href="/" className="text-2xl font-bold text-primary">
+            Parttimejob
+          </Link>
+        </div>
+        
         {showNav && (
           <nav className="hidden md:flex items-center gap-6">
             <Link
@@ -95,6 +111,7 @@ export default function Header({
                 <Avatar className="h-8 w-8">
                   <AvatarImage
                     src={
+                      userData?.profilePicture ||
                       userData?.photoURL ||
                       user?.photoURL ||
                       "/placeholder-user.jpg"
@@ -123,8 +140,8 @@ export default function Header({
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Link href="/login" className="hidden md:block">
-              <Button variant="outline">Sign In</Button>
+            <Link href="/login">
+              <Button variant="outline" size="sm" className="whitespace-nowrap">Sign In</Button>
             </Link>
           )}
         </div>
