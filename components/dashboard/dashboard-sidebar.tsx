@@ -15,8 +15,10 @@ import {
   Star,
   User,
   ClipboardCheck,
+  Building2,
+  Briefcase,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { getAuth, signOut } from "firebase/auth";
 import { useState, useEffect } from "react";
 
@@ -25,6 +27,8 @@ interface DashboardSidebarProps {
   isOpen?: boolean;
   mobileOpen?: boolean; 
   setMobileOpen?: (open: boolean) => void;
+  userData?: any;
+  user?: any;
 }
 
 export default function DashboardSidebar({
@@ -32,9 +36,24 @@ export default function DashboardSidebar({
   isOpen = true,
   mobileOpen = false,
   setMobileOpen = () => {},
+  userData,
+  user,
 }: DashboardSidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isMobile, setIsMobile] = useState(false);
+  const [dashboardType, setDashboardType] = useState<'employee' | 'employer'>(
+    pathname?.includes('/dashboard/employer') ? 'employer' : 'employee'
+  );
+
+  useEffect(() => {
+    // Check if the current path is for employer dashboard
+    if (pathname?.includes('/dashboard/employer')) {
+      setDashboardType('employer');
+    } else {
+      setDashboardType('employee');
+    }
+  }, [pathname]);
 
   useEffect(() => {
     // Check if the window is available (client-side)
@@ -54,6 +73,15 @@ export default function DashboardSidebar({
     }
   }, []);
 
+  const handleDashboardSwitch = (type: 'employee' | 'employer') => {
+    setDashboardType(type);
+    if (type === 'employer') {
+      router.push('/dashboard/employer');
+    } else {
+      router.push('/dashboard');
+    }
+  };
+
   const handleLogout = async () => {
     const auth = getAuth();
     try {
@@ -62,6 +90,99 @@ export default function DashboardSidebar({
     } catch (error) {
       console.error("Logout error:", error);
     }
+  };
+
+  const getNavigationItems = () => {
+    if (dashboardType === 'employer') {
+      return (
+        <>
+          <NavItem
+            href="/dashboard/employer"
+            icon={<Home className="h-5 w-5" />}
+            label="Overview"
+            isActive={activeRoute === "overview"}
+            isExpanded={isOpen}
+          />
+          <NavItem
+            href="/dashboard/employer/jobs"
+            icon={<Briefcase className="h-5 w-5" />}
+            label="Posted Jobs"
+            isActive={activeRoute === "jobs"}
+            isExpanded={isOpen}
+          />
+          <NavItem
+            href="/dashboard/employer/applicants"
+            icon={<FileText className="h-5 w-5" />}
+            label="Applicants"
+            isActive={activeRoute === "applicants"}
+            isExpanded={isOpen}
+          />
+          <NavItem
+            href="/dashboard/employer/messages"
+            icon={<MessageSquare className="h-5 w-5" />}
+            label="Messages"
+            isActive={activeRoute === "messages"}
+            badge="3"
+            isExpanded={isOpen}
+          />
+          <NavItem
+            href="/dashboard/employer/calendar"
+            icon={<Calendar className="h-5 w-5" />}
+            label="Calendar"
+            isActive={activeRoute === "calendar"}
+            isExpanded={isOpen}
+          />
+        </>
+      );
+    }
+
+    return (
+      <>
+        <NavItem
+          href="/dashboard"
+          icon={<Home className="h-5 w-5" />}
+          label="Overview"
+          isActive={activeRoute === "overview"}
+          isExpanded={isOpen}
+        />
+        <NavItem
+          href="/dashboard/applications"
+          icon={<FileText className="h-5 w-5" />}
+          label="Applications"
+          isActive={activeRoute === "applications"}
+          isExpanded={isOpen}
+        />
+        <NavItem
+          href="/dashboard/job-status"
+          icon={<ClipboardCheck className="h-5 w-5" />}
+          label="Job Status"
+          isActive={activeRoute === "job-status"}
+          isExpanded={isOpen}
+        />
+        <NavItem
+          href="/dashboard/saved-jobs"
+          icon={<Star className="h-5 w-5" />}
+          label="Saved Jobs"
+          isActive={activeRoute === "saved-jobs"}
+          isExpanded={isOpen}
+        />
+        <NavItem
+          href="/dashboard/messages"
+          icon={<MessageSquare className="h-5 w-5" />}
+          label="Messages"
+          isActive={activeRoute === "messages"}
+          badge="3"
+          isExpanded={isOpen}
+        />
+        <NavItem
+          href="/dashboard/calendar"
+          icon={<Calendar className="h-5 w-5" />}
+          label="Calendar"
+          isActive={activeRoute === "calendar"}
+          isExpanded={isOpen}
+        />
+      </>
+    );
   };
 
   const sidebarContent = (
@@ -78,49 +199,36 @@ export default function DashboardSidebar({
       </div>
       <div className="flex-1 overflow-auto py-2">
         <nav className="space-y-1 px-2">
-          <NavItem
-            href="/dashboard"
-            icon={<Home className="h-5 w-5" />}
-            label="Overview"
-            isActive={activeRoute === "overview"}
-            isExpanded={isOpen}
-          />
-          <NavItem
-            href="/dashboard/applications"
-            icon={<FileText className="h-5 w-5" />}
-            label="Applications"
-            isActive={activeRoute === "applications"}
-            isExpanded={isOpen}
-          />
-          <NavItem
-            href="/dashboard/job-status"
-            icon={<ClipboardCheck className="h-5 w-5" />}
-            label="Job Status"
-            isActive={activeRoute === "job-status"}
-            isExpanded={isOpen}
-          />
-          <NavItem
-            href="/dashboard/saved-jobs"
-            icon={<Star className="h-5 w-5" />}
-            label="Saved Jobs"
-            isActive={activeRoute === "saved-jobs"}
-            isExpanded={isOpen}
-          />
-          <NavItem
-            href="/dashboard/messages"
-            icon={<MessageSquare className="h-5 w-5" />}
-            label="Messages"
-            isActive={activeRoute === "messages"}
-            badge="3"
-            isExpanded={isOpen}
-          />
-          <NavItem
-            href="/dashboard/calendar"
-            icon={<Calendar className="h-5 w-5" />}
-            label="Calendar"
-            isActive={activeRoute === "calendar"}
-            isExpanded={isOpen}
-          />
+          {isOpen && (
+            <div className="px-3 mb-4">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                Dashboard Type
+              </h3>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => handleDashboardSwitch('employee')}
+                  className={`flex-1 px-2 py-1 text-xs rounded-md ${
+                    dashboardType === 'employee'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Briefcase className="h-4 w-4 mx-auto" />
+                </button>
+                <button
+                  onClick={() => handleDashboardSwitch('employer')}
+                  className={`flex-1 px-2 py-1 text-xs rounded-md ${
+                    dashboardType === 'employer'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Building2 className="h-4 w-4 mx-auto" />
+                </button>
+              </div>
+            </div>
+          )}
+          {getNavigationItems()}
         </nav>
         <div className="px-3 py-4 mt-6">
           {isOpen && (
@@ -130,14 +238,14 @@ export default function DashboardSidebar({
           )}
           <nav className="mt-2 space-y-1">
             <NavItem
-              href="/dashboard/profile"
+              href={`/dashboard/${dashboardType}/profile`}
               icon={<User className="h-5 w-5" />}
               label="Profile"
               isActive={activeRoute === "profile"}
               isExpanded={isOpen}
             />
             <NavItem
-              href="/dashboard/settings"
+              href={`/dashboard/${dashboardType}/settings`}
               icon={<Settings className="h-5 w-5" />}
               label="Settings"
               isActive={activeRoute === "settings"}
@@ -157,14 +265,17 @@ export default function DashboardSidebar({
       <div className="p-4 border-t">
         <div className="flex items-center">
           <Avatar className="h-8 w-8">
-            <AvatarImage src="/placeholder.svg?height=32&width=32" alt="User" />
-            <AvatarFallback>JD</AvatarFallback>
+            <AvatarImage 
+              src={userData?.profilePicture || userData?.photoURL || "/placeholder.svg?height=32&width=32"} 
+              alt={user?.displayName || "User"} 
+            />
+            <AvatarFallback>{user?.displayName?.[0] || "U"}</AvatarFallback>
           </Avatar>
           {isOpen && (
             <div className="ml-3">
-              <p className="text-sm font-medium">John Doe</p>
+              <p className="text-sm font-medium">{user?.displayName || "Complete Profile"}</p>
               <p className="text-xs text-muted-foreground">
-                john.doe@example.com
+                {user?.email || "Add your details"}
               </p>
             </div>
           )}

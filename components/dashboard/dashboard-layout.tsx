@@ -52,6 +52,8 @@ export default function DashboardLayout({
         isOpen={sidebarOpen} 
         mobileOpen={mobileSidebarOpen}
         setMobileOpen={setMobileSidebarOpen}
+        userData={userData}
+        user={user}
       />
 
       <div className="flex-1 min-w-0 overflow-auto">

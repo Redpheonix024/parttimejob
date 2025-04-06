@@ -2,9 +2,9 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,37 +19,99 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Lock, Shield } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/app/config/firebase";
+import { checkAdminRole } from "@/app/utils/admin";
 
 export default function AdminLogin() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/admin/dashboard";
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isProcessingLogin, setIsProcessingLogin] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          // Check if user has admin privileges
+          const isAdmin = await checkAdminRole(user.uid);
+          if (isAdmin) {
+            // User is already authenticated as admin, redirect to dashboard or callback URL
+            router.push(callbackUrl);
+          }
+        } catch (error) {
+          console.error("Error checking admin role:", error);
+        }
+      }
+      // Set loading to false in all cases to ensure the login form is displayed
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [router, callbackUrl]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setIsLoading(true);
+    setIsProcessingLogin(true);
 
     // Get form data
     const formData = new FormData(e.target as HTMLFormElement);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    // Simple validation - in a real app, this would be handled by a server
-    if (email === "admin@Parttimejob.com" && password === "admin123") {
-      // Simulate authentication delay
-      setTimeout(() => {
-        setIsLoading(false);
-        router.push("/admin/dashboard");
-      }, 1500);
-    } else {
-      // Show error message
-      setTimeout(() => {
-        setIsLoading(false);
-        setError("Invalid email or password. Please try again.");
-      }, 1000);
+    try {
+      // Authenticate with Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Check if user has admin role
+      const isAdmin = await checkAdminRole(user.uid);
+      
+      if (isAdmin) {
+        // User is authenticated and has admin role
+        // Generate the session cookie for middleware
+        const idToken = await user.getIdToken();
+        
+        // Set the admin-session cookie (this will be used by middleware)
+        document.cookie = `admin-session=${idToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict;`;
+        
+        // Redirect to callback URL or dashboard
+        router.push(callbackUrl);
+      } else {
+        // User doesn't have admin role
+        setError("You do not have admin privileges. Access denied.");
+        // Sign out the user since they don't have admin access
+        await auth.signOut();
+      }
+    } catch (error: any) {
+      // Handle authentication errors
+      let errorMessage = "Authentication failed";
+      
+      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
+        errorMessage = "Invalid email or password. Please try again.";
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "Too many failed login attempts. Please try again later.";
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setIsProcessingLogin(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -120,8 +182,8 @@ export default function AdminLogin() {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
+                <Button type="submit" className="w-full" disabled={isProcessingLogin}>
+                  {isProcessingLogin ? (
                     <div className="flex items-center">
                       <div className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
                       Signing in...

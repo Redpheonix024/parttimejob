@@ -2,6 +2,7 @@
 
 import type React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Briefcase,
@@ -12,20 +13,35 @@ import {
   Shield,
   Users,
 } from "lucide-react";
+import { auth } from "@/app/config/firebase";
+import { signOut } from "firebase/auth";
 
 interface AdminSidebarProps {
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
   activeLink?: string;
-  onLogout: () => void;
 }
 
 export default function AdminSidebar({
   isSidebarOpen,
   setIsSidebarOpen,
   activeLink,
-  onLogout,
 }: AdminSidebarProps) {
+  const router = useRouter();
+  
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      
+      // Clear the admin-session cookie
+      document.cookie = "admin-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict;";
+      
+      router.push("/admin/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+  
   return (
     <div
       className={`bg-card border-r h-screen sticky top-0 transition-all duration-300 ${
@@ -88,7 +104,7 @@ export default function AdminSidebar({
           className={`w-full justify-start ${
             isSidebarOpen ? "" : "justify-center px-2"
           }`}
-          onClick={onLogout}
+          onClick={handleLogout}
         >
           <LogOut className={`h-5 w-5 ${isSidebarOpen ? "mr-2" : ""}`} />
           {isSidebarOpen && "Logout"}

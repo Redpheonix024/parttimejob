@@ -4,8 +4,8 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import AdminSidebar from "@/components/layout/admin-sidebar"
-import AdminHeader from "@/components/layout/admin-header"
+import AdminSidebar from "@/components/admin/admin-sidebar"
+import AdminHeader from "@/components/admin/admin-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -28,18 +28,12 @@ export default function AdminDashboard() {
   const router = useRouter()
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
-  const handleLogout = () => {
-    // In a real app, this would clear authentication state
-    router.push("/admin/login")
-  }
-
   return (
     <div className="min-h-screen bg-background flex">
       <AdminSidebar
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
         activeLink="dashboard"
-        onLogout={handleLogout}
       />
 
       {/* Main content */}
@@ -272,7 +266,34 @@ export default function AdminDashboard() {
   )
 }
 
-// Stat Card Component
+// Dummy data for recent activities
+const recentActivities = [
+  {
+    type: "User",
+    title: "New User Registration",
+    description: "Rahul Sharma registered as a job seeker.",
+    time: "10 min ago",
+  },
+  {
+    type: "Job",
+    title: "New Job Posted",
+    description: "Tech Innovators posted 'Frontend Developer' job.",
+    time: "45 min ago",
+  },
+  {
+    type: "Payment",
+    title: "Subscription Payment",
+    description: "QuickHire upgraded to Professional Plan.",
+    time: "1 hour ago",
+  },
+  {
+    type: "Application",
+    title: "Job Application",
+    description: "14 new applications for 'Customer Support Executive'.",
+    time: "3 hours ago",
+  },
+]
+
 function StatCard({
   title,
   value,
@@ -288,36 +309,43 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-          {icon}
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+            {icon}
+          </div>
+          <div
+            className={`text-xs font-medium flex items-center ${
+              trend === "up" ? "text-green-500" : "text-red-500"
+            }`}
+          >
+            {change}
+            <ChevronDown
+              className={`h-3 w-3 ml-1 ${trend === "up" ? "rotate-180" : ""}`}
+            />
+          </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <div className={`flex items-center text-xs mt-1 ${trend === "up" ? "text-green-500" : "text-red-500"}`}>
-          <ChevronDown className={`h-4 w-4 ${trend === "up" ? "rotate-180" : ""}`} />
-          <span>{change} from last month</span>
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="text-2xl font-bold">{value}</p>
         </div>
       </CardContent>
     </Card>
   )
 }
 
-// Helper functions for activity styling
 function getActivityColor(type: string) {
   switch (type) {
     case "User":
-      return "bg-blue-100 text-blue-600"
+      return "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300"
     case "Job":
-      return "bg-green-100 text-green-600"
+      return "bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300"
     case "Payment":
-      return "bg-purple-100 text-purple-600"
-    case "System":
-      return "bg-orange-100 text-orange-600"
+      return "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
+    case "Application":
+      return "bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300"
     default:
-      return "bg-gray-100 text-gray-600"
+      return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
   }
 }
 
@@ -328,60 +356,26 @@ function getActivityIcon(type: string) {
     case "Job":
       return <Briefcase className="h-5 w-5" />
     case "Payment":
-      return <RupeeIcon className="h-5 w-5" />
-    case "System":
-      return <BarChart3 className="h-5 w-5" />
-    default:
+      return <DollarSign className="h-5 w-5" />
+    case "Application":
       return <FileText className="h-5 w-5" />
+    default:
+      return <BarChart3 className="h-5 w-5" />
   }
 }
 
 function getActivityBadgeVariant(type: string) {
   switch (type) {
     case "User":
-      return "secondary"
-    case "Job":
-      return "default"
-    case "Payment":
       return "outline"
-    case "System":
+    case "Job":
+      return "secondary"
+    case "Payment":
+      return "default"
+    case "Application":
       return "destructive"
     default:
-      return "secondary"
+      return "outline"
   }
 }
-
-// Sample data
-const recentActivities = [
-  {
-    type: "User",
-    title: "New User Registration",
-    description: "John Doe (john.doe@example.com) created a new account",
-    time: "5 minutes ago",
-  },
-  {
-    type: "Job",
-    title: "New Job Posted",
-    description: "Weekend Barista position posted by Coffee House",
-    time: "25 minutes ago",
-  },
-  {
-    type: "Payment",
-    title: "Subscription Payment",
-    description: "Tech Solutions Inc. renewed their Professional plan",
-    time: "1 hour ago",
-  },
-  {
-    type: "User",
-    title: "Profile Updated",
-    description: "Sarah Johnson updated her profile information",
-    time: "2 hours ago",
-  },
-  {
-    type: "System",
-    title: "System Maintenance",
-    description: "Scheduled database backup completed successfully",
-    time: "4 hours ago",
-  },
-]
 
