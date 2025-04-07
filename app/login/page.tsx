@@ -14,6 +14,7 @@ import {
 } from "firebase/auth";
 import { auth, db } from "../config/firebase"; // Add this import
 import { doc, setDoc, getDoc } from "firebase/firestore"; // Add this import
+import { checkAdminRole } from "@/app/utils/admin";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -79,6 +80,18 @@ export default function AuthPage() {
         email,
         password
       );
+      
+      // Check if user has admin role
+      const isAdmin = await checkAdminRole(userCredential.user.uid);
+      
+      if (isAdmin) {
+        // Sign out the admin user and show error
+        await auth.signOut();
+        setError("Admin accounts must log in through the admin login page.");
+        setIsLoading(false);
+        return;
+      }
+
       const token = await userCredential.user.getIdToken();
 
       // Set authentication cookie
@@ -138,6 +151,7 @@ export default function AuthPage() {
         dateOfBirth,
         gender,
         phone,
+        role: 'job seeker', // Set default role as job seeker
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -191,6 +205,7 @@ export default function AuthPage() {
             result.user.displayName?.split(" ").slice(1).join(" ") || "",
           email: result.user.email,
           phone: result.user.phoneNumber || "",
+          role: 'job seeker', // Set default role as job seeker
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           authProvider: "google",
@@ -705,15 +720,6 @@ export default function AuthPage() {
           </DialogHeader>
         </DialogContent>
       </Dialog>
-
-      <div className="container mx-auto px-4 text-center mb-8">
-        <Link
-          href="/admin/login"
-          className="text-sm text-muted-foreground hover:text-primary"
-        >
-          Admin Login
-        </Link>
-      </div>
 
       <footer className="bg-background border-t py-6 mt-12">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">

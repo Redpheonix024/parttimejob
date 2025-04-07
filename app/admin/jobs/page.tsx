@@ -1,11 +1,11 @@
 "use client";
 
-import type React from "react";
-
-import { useState } from "react";
-import Link from "next/link";
+import React from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import AdminSidebar from "@/components/layout/admin-sidebar";
+import AdminHeader from "@/components/layout/admin-header";
 import {
   Card,
   CardContent,
@@ -13,8 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -31,6 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Bell,
   Briefcase,
@@ -57,6 +58,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { db } from "@/app/config/firebase";
+import { format } from "date-fns";
+import { toast } from "sonner";
+
+interface Job {
+  id: string;
+  title: string;
+  company: string;
+  category: string;
+  location: string;
+  postedDate: string;
+  status: string;
+  rate: string;
+  duration: string;
+  applications: number;
+  userId: string;
+}
 
 export default function AdminJobs() {
   const router = useRouter();
@@ -64,32 +83,180 @@ export default function AdminJobs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogout = () => {
-    // In a real app, this would clear authentication state
-    router.push("/admin/login");
-  };
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const jobsRef = collection(db, "jobs");
+        let q = query(jobsRef, orderBy("createdAt", "desc"));
 
-  // Filter jobs based on search query and filters
+        // Apply status filter if not "all"
+        if (statusFilter !== "all") {
+          q = query(q, where("status", "==", statusFilter));
+        }
+
+        const querySnapshot = await getDocs(q);
+        
+        const jobsData = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            title: data.title || '',
+            company: data.company || '',
+            category: data.category || '',
+            location: data.location?.address || 'Remote',
+            postedDate: data.createdAt ? format(new Date(data.createdAt.toDate()), 'MMM d, yyyy') : 'N/A',
+            status: data.status || 'pending',
+            rate: data.salaryAmount ? `₹${data.salaryAmount}/${data.salaryType}` : 'Not specified',
+            duration: data.duration || 'Not specified',
+            applications: data.applications?.length || 0,
+            userId: data.userId || ''
+          };
+        }) as Job[];
+        
+        setJobs(jobsData);
+      } catch (err) {
+        console.error("Error fetching jobs:", err);
+        toast.error("Failed to load jobs. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, [statusFilter]);
+
   const filteredJobs = jobs.filter((job) => {
-    // Search filter
     const matchesSearch =
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.location.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Category filter
     const matchesCategory =
       categoryFilter === "all" ||
       job.category.toLowerCase() === categoryFilter.toLowerCase();
 
-    // Status filter
     const matchesStatus =
       statusFilter === "all" ||
       job.status.toLowerCase() === statusFilter.toLowerCase();
 
     return matchesSearch && matchesCategory && matchesStatus;
   });
+
+  const handleLogout = () => {
+    router.push("/admin/login");
+  };
+
+  const columns: ColumnDef<Job>[] = [
+    {
+      accessorKey: "title",
+      header: "Job",
+      cell: ({ row }) => {
+        const job = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center">
+              <Briefcase className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <Link 
+                href={`/admin/jobs/${job.id}`}
+                className="font-medium hover:underline"
+              >
+                {job.title}
+              </Link>
+              <div className="text-sm text-muted-foreground">
+                {job.company}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "category",
+      header: "Category",
+      cell: ({ row }) => {
+        const job = row.original;
+        return (
+          <Badge variant="secondary">{job.category}</Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "location",
+      header: "Location",
+    },
+    {
+      accessorKey: "postedDate",
+      header: "Posted",
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const job = row.original;
+        return (
+          <Badge
+            variant={
+              job.status === "active"
+                ? "default"
+                : job.status === "pending"
+                ? "outline"
+                : job.status === "expired"
+                ? "destructive"
+                : "secondary"
+            }
+          >
+            {job.status}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const job = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/admin/jobs/${job.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Details
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -295,7 +462,12 @@ export default function AdminJobs() {
                               <Briefcase className="h-5 w-5 text-primary" />
                             </div>
                             <div>
-                              <div className="font-medium">{job.title}</div>
+                              <Link 
+                                href={`/admin/jobs/${job.id}`}
+                                className="font-medium hover:underline"
+                              >
+                                {job.title}
+                              </Link>
                               <div className="text-sm text-muted-foreground">
                                 {job.company}
                               </div>
@@ -310,11 +482,11 @@ export default function AdminJobs() {
                         <TableCell>
                           <Badge
                             variant={
-                              job.status === "Active"
+                              job.status === "active"
                                 ? "default"
-                                : job.status === "Pending"
+                                : job.status === "pending"
                                 ? "outline"
-                                : job.status === "Expired"
+                                : job.status === "expired"
                                 ? "destructive"
                                 : "secondary"
                             }
@@ -331,7 +503,6 @@ export default function AdminJobs() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
                               <DropdownMenuItem>
                                 <Eye className="mr-2 h-4 w-4" />
                                 View
@@ -342,7 +513,7 @@ export default function AdminJobs() {
                               </DropdownMenuItem>
                               <DropdownMenuItem>
                                 <Shield className="mr-2 h-4 w-4" />
-                                {job.status === "Active"
+                                {job.status === "active"
                                   ? "Deactivate"
                                   : "Activate"}
                               </DropdownMenuItem>
@@ -421,103 +592,3 @@ function NavItem({
     </Link>
   );
 }
-
-// Sample job data
-const jobs = [
-  {
-    id: "1",
-    title: "Weekend Barista",
-    company: "Coffee House",
-    category: "Food Service",
-    location: "San Francisco, CA",
-    postedDate: "May 10, 2023",
-    status: "Active",
-    rate: "₹1350-1650/hour",
-    duration: "3 months",
-    applications: 12,
-  },
-  {
-    id: "2",
-    title: "Event Photographer",
-    company: "EventPro Agency",
-    category: "Creative",
-    location: "Remote",
-    postedDate: "May 8, 2023",
-    status: "Active",
-    rate: "₹1875-2625/hour",
-    duration: "One-time event",
-    applications: 8,
-  },
-  {
-    id: "3",
-    title: "Dog Walker",
-    company: "PetCare Services",
-    category: "Service",
-    location: "Brooklyn, NY",
-    postedDate: "May 5, 2023",
-    status: "Active",
-    rate: "₹1125-1350/hour",
-    duration: "Ongoing",
-    applications: 5,
-  },
-  {
-    id: "4",
-    title: "Social Media Assistant",
-    company: "Digital Marketing Co.",
-    category: "Marketing",
-    location: "Remote",
-    postedDate: "May 3, 2023",
-    status: "Pending",
-    rate: "₹1500-1875/hour",
-    duration: "6 months",
-    applications: 15,
-  },
-  {
-    id: "5",
-    title: "Delivery Driver",
-    company: "Local Eats",
-    category: "Delivery",
-    location: "Chicago, IL",
-    postedDate: "May 1, 2023",
-    status: "Active",
-    rate: "₹1275-1500/hour + tips",
-    duration: "Ongoing",
-    applications: 20,
-  },
-  {
-    id: "6",
-    title: "Tutor - Mathematics",
-    company: "Learning Center",
-    category: "Education",
-    location: "Hybrid",
-    postedDate: "April 28, 2023",
-    status: "Active",
-    rate: "₹1875-2250/hour",
-    duration: "School year",
-    applications: 3,
-  },
-  {
-    id: "7",
-    title: "Web Developer",
-    company: "Tech Solutions Inc.",
-    category: "Technology",
-    location: "Remote",
-    postedDate: "April 25, 2023",
-    status: "Draft",
-    rate: "₹2250-3000/hour",
-    duration: "3 months",
-    applications: 0,
-  },
-  {
-    id: "8",
-    title: "Retail Associate",
-    company: "Fashion Outlet",
-    category: "Retail",
-    location: "Miami, FL",
-    postedDate: "April 20, 2023",
-    status: "Expired",
-    rate: "₹1125-1275/hour",
-    duration: "Seasonal",
-    applications: 18,
-  },
-];

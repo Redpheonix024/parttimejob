@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowLeft, MapPin, Loader2, Mic, Square, Play, Pause } from "lucide-react";
+import { ArrowLeft, MapPin, Loader2, Mic, Square, Play, Pause, Link2, Unlink2 } from "lucide-react";
 import Script from "next/script";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -42,10 +42,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { doc, setDoc, collection, Timestamp } from "firebase/firestore";
+import { doc, setDoc, collection, Timestamp, updateDoc } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { uploadToS3 } from "@/app/utils/aws-config";
 import { v4 as uuidv4 } from "uuid";
+import dynamic from 'next/dynamic';
+
+// Add type declarations for Window interface
+declare global {
+  interface Window {
+    initMap: () => void;
+  }
+}
 
 // Define a proper interface for contacts
 interface Contact {
@@ -53,19 +61,52 @@ interface Contact {
   phone: string;
 }
 
-// Add Google Maps type declaration
-declare global {
-  interface Window {
-    google: typeof google;
-    initMap: () => void;
-  }
-}
-
 // Define interface for location data
 interface LocationData {
   lat: number;
   lng: number;
 }
+
+// Define interface for address data
+interface AddressData {
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
+// Define interface for form data
+interface FormData {
+  title: string;
+  company: string;
+  salaryType: string;
+  salaryAmount: string;
+  positions: string;
+  gender: string;
+  minAge: string;
+  maxAge: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+  category: string;
+  skills: string;
+  jobType: string;
+  hours: string;
+  duration: string;
+  payType: string;
+  applicationInstructions: string;
+  termsAccepted: boolean;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
+// Dynamically import the Map component to avoid SSR issues
+const Map = dynamic(() => import('@/components/map'), {
+  ssr: false,
+  loading: () => <div className="h-[350px] w-full bg-muted animate-pulse rounded-md" />
+});
 
 export default function PostJob() {
   const router = useRouter();
@@ -75,13 +116,19 @@ export default function PostJob() {
   const [workLocation, setWorkLocation] = useState("on-site");
   const [location, setLocation] = useState<LocationData>({
     lat: 40.7128,
-    lng: -74.0060, // Default to New York coordinates if geolocation fails
+    lng: -74.0060, // Default to New York coordinates
   });
-  const [mapLoaded, setMapLoaded] = useState(false);
+  const [address, setAddress] = useState<AddressData>({
+    address: "",
+    city: "",
+    state: "",
+    zip: "",
+  });
   const [showMap, setShowMap] = useState(false);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([{ name: "", phone: "" }]);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
@@ -99,7 +146,7 @@ export default function PostJob() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const MAX_RECORDING_TIME = 120; // maximum recording time in seconds
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     title: "",
     company: "",
     salaryType: "",
@@ -117,17 +164,20 @@ export default function PostJob() {
     hours: "",
     duration: "",
     payType: "",
+    applicationInstructions: "",
+    termsAccepted: false,
     address: "",
     city: "",
     state: "",
-    zip: "",
-    applicationInstructions: "",
-    termsAccepted: false
+    zip: ""
   });
   
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Handle voice recording
+  // Add state for map attachment
+  const [isMapAttached, setIsMapAttached] = useState(true);
+
+  // Voice recording
   const startRecording = async () => {
     audioChunksRef.current = [];
     setRecordingTime(0);
@@ -259,7 +309,71 @@ export default function PostJob() {
     };
   }, [audioUrl]);
 
-  // Get user's current location
+  // Handle map click to update location
+  const handleMapClick = useCallback(async (lat: number, lng: number) => {
+    setLocation({ lat, lng });
+    
+    // Reverse geocode to get address
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+      );
+      const data = await response.json();
+      
+      if (data.address) {
+        const address = data.address;
+        setFormData(prev => ({
+          ...prev,
+          address: address.road || address.highway || address.pedestrian || "",
+          city: address.city || address.town || address.village || address.suburb || "",
+          state: address.state || address.region || "",
+          zip: address.postcode || ""
+        }));
+      }
+    } catch (error) {
+      console.error("Error getting address:", error);
+      toast.error("Could not fetch address details");
+    }
+  }, []);
+
+  // Handle address search
+  const handleAddressSearch = useCallback(async (query: string) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`
+      );
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const { lat, lon } = data[0];
+        setLocation({ lat: parseFloat(lat), lng: parseFloat(lon) });
+        
+        // Get address details
+        const addressResponse = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`
+        );
+        const addressData = await addressResponse.json();
+        
+        if (addressData.address) {
+          const address = addressData.address;
+          setFormData(prev => ({
+            ...prev,
+            address: address.road || address.highway || address.pedestrian || "",
+            city: address.city || address.town || address.village || address.suburb || "",
+            state: address.state || address.region || "",
+            zip: address.postcode || ""
+          }));
+        }
+      } else {
+        toast.error("No location found for the given address");
+      }
+    } catch (error) {
+      console.error("Error searching address:", error);
+      toast.error("Could not search for the address");
+    }
+  }, []);
+
+  // Get user's current location using browser's geolocation
   const getCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setMapError("Geolocation is not supported by this browser.");
@@ -270,7 +384,7 @@ export default function PostJob() {
     setMapError(null);
     
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords;
         
         setLocation({
@@ -278,13 +392,26 @@ export default function PostJob() {
           lng: longitude,
         });
         
-        // If map is already initialized, update its center
-        if (googleMapRef.current) {
-          googleMapRef.current.setCenter({ lat: latitude, lng: longitude });
+        // Reverse geocode to get address
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+          );
+          const data = await response.json();
           
-          if (markerRef.current) {
-            markerRef.current.setPosition({ lat: latitude, lng: longitude });
+          if (data.address) {
+            const address = data.address;
+            setFormData(prev => ({
+              ...prev,
+              address: address.road || address.highway || address.pedestrian || "",
+              city: address.city || address.town || address.village || address.suburb || "",
+              state: address.state || address.region || "",
+              zip: address.postcode || ""
+            }));
           }
+        } catch (error) {
+          console.error("Error getting address:", error);
+          toast.error("Could not fetch address details");
         }
         
         setIsLoadingLocation(false);
@@ -297,11 +424,6 @@ export default function PostJob() {
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
   }, []);
-
-  // Try to get user's location when component mounts
-  useEffect(() => {
-    getCurrentLocation();
-  }, [getCurrentLocation]);
 
   // Handle input change
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -509,6 +631,14 @@ export default function PostJob() {
         const jobRef = doc(db, "jobs", jobId);
         await setDoc(jobRef, jobData);
         console.log("Job data saved successfully with ID:", jobId);
+
+        // Update user's role to employer
+        const userRef = doc(db, "users", user.uid);
+        await updateDoc(userRef, {
+          role: 'employer',
+          updatedAt: Timestamp.now()
+        });
+        console.log("User role updated to employer");
       } catch (firestoreError) {
         console.error("Error saving to Firestore:", firestoreError);
         toast.error("Failed to save job data. Please try again.");
@@ -517,7 +647,7 @@ export default function PostJob() {
       
       // Success! Redirect to confirmation page
       toast.success("Job posted successfully! It's now pending review.");
-      router.push("/job-posted");
+      router.push("/dashboard/jobs");
     } catch (error) {
       console.error("Error submitting job:", error);
       toast.error("Failed to submit job. Please try again.");
@@ -903,88 +1033,110 @@ export default function PostJob() {
                       <p className="text-red-500 text-xs mt-1">{formErrors.endDate}</p>
                     )}
                   </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                  <div className="space-y-2">
-                    <Label>Job Description</Label>
-                    <div className="flex flex-col gap-4">
-                      <div className="border rounded-md p-4 bg-muted/30">
-                        <div className="mb-4">
-                          <h4 className="text-sm font-medium mb-2">Voice Description</h4>
-                          <p className="text-xs text-muted-foreground mb-4">Record a voice description of the job (max 2 minutes)</p>
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Job Description</CardTitle>
+                <CardDescription>
+                  Provide a detailed description of the job responsibilities and requirements.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="border rounded-md p-4 bg-muted/30">
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium mb-2">Voice Description</h4>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Record a voice description of the job (max 2 minutes). This helps applicants better understand the role.
+                      </p>
+                    
+                      <div className="flex items-center gap-2 mb-3">
+                        {!isRecording && !audioUrl && (
+                          <Button 
+                            type="button"
+                            onClick={startRecording}
+                            className="flex items-center gap-2"
+                            variant="secondary"
+                            size="sm"
+                          >
+                            <Mic className="h-4 w-4" />
+                            Start Recording
+                          </Button>
+                        )}
                         
-                          <div className="flex items-center gap-2 mb-3">
-                            {!isRecording && !audioUrl && (
-                              <Button 
-                                type="button"
-                                onClick={startRecording}
-                                className="flex items-center gap-2"
-                                variant="secondary"
-                                size="sm"
-                              >
-                                <Mic className="h-4 w-4" />
-                                Start Recording
-                              </Button>
-                            )}
-                            
-                            {isRecording && !isPaused && (
-                              <>
-                                <Button 
-                                  type="button"
-                                  onClick={pauseRecording}
-                                  className="flex items-center gap-2"
-                                  variant="outline"
-                                  size="sm"
-                                >
-                                  <Pause className="h-4 w-4" />
-                                  Pause
-                                </Button>
-                                <Button 
-                                  type="button"
-                                  onClick={stopRecording}
-                                  className="flex items-center gap-2"
-                                  variant="destructive"
-                                  size="sm"
-                                >
-                                  <Square className="h-4 w-4" />
-                                  Stop
-                                </Button>
-                              </>
-                            )}
-                            
-                            {isRecording && isPaused && (
-                              <>
-                                <Button 
-                                  type="button"
-                                  onClick={resumeRecording}
-                                  className="flex items-center gap-2"
-                                  variant="outline"
-                                  size="sm"
-                                >
-                                  <Play className="h-4 w-4" />
-                                  Resume
-                                </Button>
-                                <Button 
-                                  type="button"
-                                  onClick={stopRecording}
-                                  className="flex items-center gap-2"
-                                  variant="destructive"
-                                  size="sm"
-                                >
-                                  <Square className="h-4 w-4" />
-                                  Stop
-                                </Button>
-                              </>
-                            )}
-                            
-                            {audioUrl && !isRecording && (
-                              <>
+                        {isRecording && !isPaused && (
+                          <>
+                            <Button 
+                              type="button"
+                              onClick={pauseRecording}
+                              className="flex items-center gap-2"
+                              variant="outline"
+                              size="sm"
+                            >
+                              <Pause className="h-4 w-4" />
+                              Pause
+                            </Button>
+                            <Button 
+                              type="button"
+                              onClick={stopRecording}
+                              className="flex items-center gap-2"
+                              variant="destructive"
+                              size="sm"
+                            >
+                              <Square className="h-4 w-4" />
+                              Stop
+                            </Button>
+                          </>
+                        )}
+                        
+                        {isRecording && isPaused && (
+                          <>
+                            <Button 
+                              type="button"
+                              onClick={resumeRecording}
+                              className="flex items-center gap-2"
+                              variant="outline"
+                              size="sm"
+                            >
+                              <Play className="h-4 w-4" />
+                              Resume
+                            </Button>
+                            <Button 
+                              type="button"
+                              onClick={stopRecording}
+                              className="flex items-center gap-2"
+                              variant="destructive"
+                              size="sm"
+                            >
+                              <Square className="h-4 w-4" />
+                              Stop
+                            </Button>
+                          </>
+                        )}
+                        
+                        {audioUrl && !isRecording && (
+                          <>
+                            <div className="flex flex-col gap-3 bg-muted/50 p-4 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Mic className="h-4 w-4 text-primary" />
+                                  <span className="text-sm font-medium">Voice Description</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatTime(recordingTime)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4">
                                 <audio 
                                   ref={audioRef} 
                                   src={audioUrl} 
                                   controls 
-                                  className="w-full max-w-[300px] h-10"
+                                  className="flex-1 h-10 [&::-webkit-media-controls-panel]:bg-muted/50 [&::-webkit-media-controls-current-time-display]:text-xs [&::-webkit-media-controls-time-remaining-display]:text-xs"
                                 />
-                                <div className="flex gap-2 mt-2">
+                                <div className="flex gap-2">
                                   <Button 
                                     type="button"
                                     onClick={() => {
@@ -994,49 +1146,54 @@ export default function PostJob() {
                                     }}
                                     variant="destructive"
                                     size="sm"
+                                    className="h-8"
                                   >
-                                    Delete Recording
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                                   </Button>
                                   <Button 
                                     type="button"
                                     onClick={startRecording}
                                     variant="outline"
                                     size="sm"
+                                    className="h-8"
                                   >
-                                    Record Again
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
                                   </Button>
                                 </div>
-                              </>
-                            )}
-                          </div>
-                          
-                          {isRecording && (
-                            <div className="mb-2">
-                              <div className="flex justify-between text-xs mb-1">
-                                <span>Recording {isPaused ? "(Paused)" : ""}</span>
-                                <span>{formatTime(recordingTime)} / {formatTime(MAX_RECORDING_TIME)}</span>
                               </div>
-                              <Progress value={(recordingTime / MAX_RECORDING_TIME) * 100} className="h-2" />
                             </div>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <h4 className="text-sm font-medium mb-2">Or type your description below</h4>
-                          <Textarea
-                            id="description"
-                            placeholder="Describe the responsibilities, requirements, and any other relevant details"
-                            value={formData.description}
-                            onChange={handleChange}
-                            className={`min-h-[150px] ${formErrors.description ? "border-red-500" : ""}`}
-                          />
-                          {audioUrl && (
-                            <p className="text-xs text-amber-600 mt-1">
-                              You have provided both a voice and text description. Both will be available to applicants.
-                            </p>
-                          )}
-                        </div>
+                          </>
+                        )}
                       </div>
+                      
+                      {isRecording && (
+                        <div className="mb-2">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span>Recording {isPaused ? "(Paused)" : ""}</span>
+                            <span>{formatTime(recordingTime)} / {formatTime(MAX_RECORDING_TIME)}</span>
+                          </div>
+                          <Progress value={(recordingTime / MAX_RECORDING_TIME) * 100} className="h-2" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Text Description</h4>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Provide a detailed written description of the job. Include responsibilities, requirements, and any other relevant information.
+                      </p>
+                      <Textarea
+                        id="description"
+                        placeholder="Describe the responsibilities, requirements, and any other relevant details"
+                        value={formData.description}
+                        onChange={handleChange}
+                        className={`min-h-[150px] ${formErrors.description ? "border-red-500" : ""}`}
+                      />
+                      {audioUrl && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          You have provided both a voice and text description. Both will be available to applicants.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1077,6 +1234,9 @@ export default function PostJob() {
                       onChange={handleChange}
                       className={formErrors.skills ? "border-red-500" : ""}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Separate skills with commas
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -1260,13 +1420,34 @@ export default function PostJob() {
                 {workLocation === "on-site" && (
                   <>
                     <div className="space-y-4">
-                      <Label>Select Location on Map</Label>
+                      <div className="flex items-center justify-between">
+                        <Label>Select Location on Map</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsMapAttached(!isMapAttached)}
+                          className="flex items-center gap-2"
+                        >
+                          {isMapAttached ? (
+                            <>
+                              <Unlink2 className="h-4 w-4" />
+                              <span className="text-sm">Detach Map</span>
+                            </>
+                          ) : (
+                            <>
+                              <Link2 className="h-4 w-4" />
+                              <span className="text-sm">Attach Map</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
                       <div className="flex gap-2">
                         <Button 
                           type="button" 
                           variant="outline" 
                           className="flex-1 flex items-center justify-center gap-2"
-                          onClick={toggleMap}
+                          onClick={() => setShowMap(!showMap)}
                         >
                           <MapPin className="h-4 w-4" />
                           {showMap ? "Hide Map" : "Show Map to Select Location"}
@@ -1298,8 +1479,7 @@ export default function PostJob() {
                             onClick={() => {
                               setMapError(null);
                               if (showMap) {
-                                googleMapRef.current = null;
-                                initializeMap();
+                                getCurrentLocation();
                               }
                             }}
                           >
@@ -1310,86 +1490,81 @@ export default function PostJob() {
                       
                       {showMap && (
                         <div className="border rounded-md overflow-hidden">
-                          <div 
-                            ref={mapRef} 
-                            className="h-[350px] w-full"
-                          ></div>
+                          <Map
+                            center={[location.lat, location.lng]}
+                            onMapClick={handleMapClick}
+                            markerPosition={[location.lat, location.lng]}
+                          />
                           <div className="bg-muted p-2 text-xs text-muted-foreground">
                             Click on the map or drag the marker to select your precise location
                           </div>
                         </div>
                       )}
                       
-                      {location.lat && location.lng && (
-                        <div className="text-xs text-muted-foreground">
-                          Selected coordinates: {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="address">Address</Label>
+                          <Input
+                            id="address"
+                            placeholder="Enter address to search"
+                            value={formData.address}
+                            onChange={(e) => {
+                              setFormData(prev => ({ ...prev, address: e.target.value }));
+                              if (isMapAttached) {
+                                handleAddressSearch(e.target.value);
+                              }
+                            }}
+                          />
                         </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="address">
-                        Address
-                      </Label>
-                      <Input 
-                        id="address" 
-                        placeholder="Street address" 
-                        required 
-                        value={formData.address}
-                        onChange={handleChange}
-                        className={formErrors.address ? "border-red-500" : ""}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="city">City</Label>
-                        <Input 
-                          id="city" 
-                          placeholder="City" 
-                          required 
-                          value={formData.city}
-                          onChange={handleChange}
-                          className={formErrors.city ? "border-red-500" : ""}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="state">State/Province</Label>
-                        <Input 
-                          id="state" 
-                          placeholder="State" 
-                          required 
-                          value={formData.state}
-                          onChange={handleChange}
-                          className={formErrors.state ? "border-red-500" : ""}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="zip">ZIP/Postal Code</Label>
-                        <Input 
-                          id="zip" 
-                          placeholder="ZIP code" 
-                          required 
-                          value={formData.zip}
-                          onChange={handleChange}
-                          className={formErrors.zip ? "border-red-500" : ""}
-                        />
+                        <div className="space-y-2">
+                          <Label htmlFor="city">City</Label>
+                          <Input
+                            id="city"
+                            placeholder="City"
+                            value={formData.city}
+                            onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                            disabled={isMapAttached}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="state">State/Province</Label>
+                          <Input
+                            id="state"
+                            placeholder="State"
+                            value={formData.state}
+                            onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+                            disabled={isMapAttached}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="zip">ZIP/Postal Code</Label>
+                          <Input
+                            id="zip"
+                            placeholder="ZIP code"
+                            value={formData.zip}
+                            onChange={(e) => setFormData(prev => ({ ...prev, zip: e.target.value }))}
+                            disabled={isMapAttached}
+                          />
+                        </div>
                       </div>
                     </div>
                   </>
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="application-instructions">
-                    Application Instructions (Optional)
+                  <Label htmlFor="applicationInstructions">
+                    Application Instructions
                   </Label>
                   <Textarea
-                    id="application-instructions"
+                    id="applicationInstructions"
                     placeholder="Provide any specific instructions for applicants"
                     value={formData.applicationInstructions}
-                    onChange={handleChange}
+                    onChange={(e) => setFormData(prev => ({ ...prev, applicationInstructions: e.target.value }))}
                     className={formErrors.applicationInstructions ? "border-red-500" : ""}
                   />
+                  {formErrors.applicationInstructions && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.applicationInstructions}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

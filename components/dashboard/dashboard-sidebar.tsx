@@ -238,14 +238,14 @@ export default function DashboardSidebar({
           )}
           <nav className="mt-2 space-y-1">
             <NavItem
-              href={`/dashboard/${dashboardType}/profile`}
+              href={`/dashboard/profile`}
               icon={<User className="h-5 w-5" />}
               label="Profile"
               isActive={activeRoute === "profile"}
               isExpanded={isOpen}
             />
             <NavItem
-              href={`/dashboard/${dashboardType}/settings`}
+              href={`/dashboard/settings`}
               icon={<Settings className="h-5 w-5" />}
               label="Settings"
               isActive={activeRoute === "settings"}
