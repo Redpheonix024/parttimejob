@@ -10,19 +10,19 @@ interface AdminHeaderProps {
 
 export default function AdminHeader({ toggleSidebar }: AdminHeaderProps) {
   return (
-    <header className="bg-background border-b sticky top-0 z-10">
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <div className="flex items-center md:hidden">
-          <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+    <header className="bg-background border-b sticky top-0 z-10 h-16">
+      <div className="h-full flex items-center justify-between px-4">
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" onClick={toggleSidebar} className="lg:hidden mr-2">
             <Menu className="h-5 w-5" />
           </Button>
+          <div className="flex-1 md:block text-lg font-semibold">
+            <h1 className="text-lg md:text-xl font-bold truncate max-w-[180px] md:max-w-full">Admin Dashboard</h1>
+          </div>
         </div>
-        <div className="flex-1 max-w-md hidden md:block">
-          <h1 className="text-xl font-bold">Admin Dashboard</h1>
-        </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           <ThemeToggle />
-          <Button variant="ghost" size="icon" className="relative">
+          <Button variant="ghost" size="icon" className="relative hidden md:flex">
             <Bell className="h-5 w-5" />
             <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-primary"></span>
           </Button>

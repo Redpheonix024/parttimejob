@@ -1,5 +1,33 @@
 import { NextResponse } from 'next/server';
-import { getJobs, getUser } from '@/lib/firebase';
+import { getJobs, getUser, deleteJob } from '@/lib/firebase';
+import { Timestamp } from 'firebase/firestore';
+
+interface Job {
+  id: string;
+  title?: string;
+  company?: string;
+  companyName?: string;
+  category?: string;
+  status?: string;
+  createdAt?: any;
+  updatedAt?: any;
+  employerId?: string;
+  draftStatus?: string;
+  flowStatus?: string;
+  positionsNeeded?: number;
+  positionsFilled?: number;
+}
+
+// Helper function to safely convert Firebase Timestamp to Date
+const convertTimestampToDate = (timestamp: any) => {
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate();
+  }
+  if (timestamp?.toDate) {
+    return timestamp.toDate();
+  }
+  return new Date();
+};
 
 export async function GET() {
   try {
@@ -10,7 +38,7 @@ export async function GET() {
     }
 
     // Transform the jobs data to match the frontend interface
-    const transformedJobs = await Promise.all(jobs.map(async job => {
+    const transformedJobs = await Promise.all(jobs.map(async (job: Job) => {
       // Get user data if available
       let user = null;
       if (job.employerId) {
@@ -35,8 +63,8 @@ export async function GET() {
         companyName: job.companyName || '',
         category: job.category || '',
         status: job.status || 'draft',
-        createdAt: job.createdAt || new Date().toISOString(),
-        updatedAt: job.updatedAt || new Date().toISOString(),
+        createdAt: job.createdAt ? convertTimestampToDate(job.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: job.updatedAt ? convertTimestampToDate(job.updatedAt).toISOString() : new Date().toISOString(),
         employerId: job.employerId || '',
         employerName: formattedName,
         employerFirstName: firstName,

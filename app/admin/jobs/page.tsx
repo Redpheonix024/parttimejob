@@ -49,7 +49,6 @@ import {
   Shield,
   Trash2,
   Users,
-  Pencil,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -59,11 +58,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, where, orderBy, Timestamp } from "firebase/firestore";
 import { db } from "@/app/config/firebase";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { ColumnDef } from "@tanstack/react-table";
 
 interface Job {
   id: string;
@@ -77,19 +75,30 @@ interface Job {
   duration: string;
   applications: number;
   userId: string;
-  createdAt: string;
-  updatedAt: string;
-  employerId: string;
-  draftStatus: string;
-  flowStatus: string;
-  positionsNeeded: number;
-  positionsFilled: number;
-  companyName?: string;
-  employerName?: string;
-  employerEmail?: string;
-  employerFirstName?: string;
-  employerLastName?: string;
 }
+
+const formatDate = (timestamp: any) => {
+  if (!timestamp) return 'N/A';
+  
+  try {
+    if (timestamp instanceof Timestamp) {
+      return format(timestamp.toDate(), 'MMM d, yyyy');
+    }
+    if (timestamp.toDate) {
+      return format(timestamp.toDate(), 'MMM d, yyyy');
+    }
+    if (typeof timestamp === 'string') {
+      return format(new Date(timestamp), 'MMM d, yyyy');
+    }
+    if (typeof timestamp === 'number') {
+      return format(new Date(timestamp), 'MMM d, yyyy');
+    }
+    return 'N/A';
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'N/A';
+  }
+};
 
 export default function AdminJobs() {
   const router = useRouter();
@@ -101,103 +110,50 @@ export default function AdminJobs() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchJobs = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const response = await fetch("/api/admin/jobs");
-      if (!response.ok) {
-        throw new Error(`Failed to fetch jobs: ${response.statusText}`);
-      }
-      const data = await response.json();
-      setJobs(data);
-    } catch (error) {
-      console.error("Error fetching jobs:", error);
-      setError(error instanceof Error ? error.message : "Failed to fetch jobs");
-      toast.error("Failed to fetch jobs. Please try again later.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const columns: ColumnDef<Job>[] = [
-    {
-      id: "title",
-      header: "Title",
-      cell: ({ row }) => row.original.title,
-    },
-    {
-      id: "company",
-      header: "Company",
-      cell: ({ row }) => (
-        <div className="flex flex-col">
-          <span className="font-medium">{row.original.companyName || row.original.company}</span>
-          <span className="text-sm text-muted-foreground">{row.original.location}</span>
-        </div>
-      ),
-    },
-    {
-      id: "employer",
-      header: "Posted By",
-      cell: ({ row }) => (
-        <div className="flex flex-col">
-          <span className="font-medium">
-            {row.original.employerFirstName} {row.original.employerLastName}
-          </span>
-          <span className="text-sm text-muted-foreground">{row.original.employerEmail}</span>
-        </div>
-      ),
-    },
-    {
-      id: "status",
-      header: "Status",
-      cell: ({ row }) => (
-        <Badge variant={row.original.status === "active" ? "default" : "secondary"}>
-          {row.original.status}
-        </Badge>
-      ),
-    },
-    {
-      id: "createdAt",
-      header: "Created At",
-      cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => {
-        const job = row.original;
-        return (
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/admin/jobs/${job.id}`}
-              className="text-primary hover:text-primary/80"
-            >
-              <Eye className="h-4 w-4" />
-            </Link>
-            <Link
-              href={`/admin/jobs/${job.id}/edit`}
-              className="text-primary hover:text-primary/80"
-            >
-              <Pencil className="h-4 w-4" />
-            </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-destructive hover:text-destructive/80"
-              onClick={() => handleDelete(job.id)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        );
-      },
-    },
-  ];
-
   useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        console.log("Fetching jobs...");
+        const jobsRef = collection(db, "jobs");
+        let q = query(jobsRef, orderBy("createdAt", "desc"));
+
+        // Apply status filter if not "all"
+        if (statusFilter !== "all") {
+          q = query(q, where("status", "==", statusFilter));
+        }
+
+        const querySnapshot = await getDocs(q);
+        console.log("Number of jobs found:", querySnapshot.size);
+        
+        const jobsData = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log("Job data:", data);
+          return {
+            id: doc.id,
+            title: data.title || '',
+            company: data.company || '',
+            category: data.category || '',
+            location: data.location?.address || 'Remote',
+            postedDate: formatDate(data.createdAt),
+            status: data.status || 'pending',
+            rate: data.salaryAmount ? `₹${data.salaryAmount}/${data.salaryType}` : 'Not specified',
+            duration: data.duration || 'Not specified',
+            applications: data.applications?.length || 0,
+            userId: data.userId || ''
+          };
+        }) as Job[];
+        
+        setJobs(jobsData);
+      } catch (err) {
+        console.error("Error fetching jobs:", err);
+        toast.error("Failed to load jobs. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchJobs();
-  }, []);
+  }, [statusFilter]);
 
   const filteredJobs = jobs.filter((job) => {
     const matchesSearch =
@@ -220,40 +176,112 @@ export default function AdminJobs() {
     router.push("/admin/login");
   };
 
-  const handleDelete = async (jobId: string) => {
-    try {
-      const response = await fetch(`/api/admin/jobs/${jobId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete job");
-      }
-
-      // Refresh the jobs list
-      fetchJobs();
-    } catch (error) {
-      console.error("Error deleting job:", error);
-    }
-  };
+  const columns: ColumnDef<Job>[] = [
+    {
+      accessorKey: "title",
+      header: "Job",
+      cell: ({ row }) => {
+        const job = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center">
+              <Briefcase className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <Link 
+                href={`/admin/jobs/${job.id}`}
+                className="font-medium hover:underline"
+              >
+                {job.title}
+              </Link>
+              <div className="text-sm text-muted-foreground">
+                {job.company}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "category",
+      header: "Category",
+      cell: ({ row }) => {
+        const job = row.original;
+        return (
+          <Badge variant="secondary">{job.category}</Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "location",
+      header: "Location",
+    },
+    {
+      accessorKey: "postedDate",
+      header: "Posted",
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const job = row.original;
+        return (
+          <Badge
+            variant={
+              job.status === "active"
+                ? "default"
+                : job.status === "pending"
+                ? "outline"
+                : job.status === "expired"
+                ? "destructive"
+                : "secondary"
+            }
+          >
+            {job.status}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const job = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/admin/jobs/${job.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Details
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <div>Loading...</div>;
   }
 
   if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <div className="text-destructive">{error}</div>
-        <Button onClick={fetchJobs} variant="outline">
-          Retry
-        </Button>
-      </div>
-    );
+    return <div className="text-red-500">{error}</div>;
   }
 
   return (
@@ -443,61 +471,85 @@ export default function AdminJobs() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Posted By</TableHead>
+                      <TableHead>Job</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Posted</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Created At</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredJobs.map((job) => (
                       <TableRow key={job.id}>
-                        <TableCell className="font-medium">{job.title}</TableCell>
                         <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{job.companyName || job.company}</span>
-                            <span className="text-sm text-muted-foreground">{job.location}</span>
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center">
+                              <Briefcase className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <Link 
+                                href={`/admin/jobs/${job.id}`}
+                                className="font-medium hover:underline"
+                              >
+                                {job.title}
+                              </Link>
+                              <div className="text-sm text-muted-foreground">
+                                {job.company}
+                              </div>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">
-                              {job.employerFirstName} {job.employerLastName}
-                            </span>
-                            <span className="text-sm text-muted-foreground">{job.employerEmail}</span>
-                          </div>
+                          <Badge variant="secondary">{job.category}</Badge>
                         </TableCell>
+                        <TableCell>{job.location}</TableCell>
+                        <TableCell>{job.postedDate}</TableCell>
                         <TableCell>
-                          <Badge variant={job.status === "active" ? "default" : "secondary"}>
+                          <Badge
+                            variant={
+                              job.status === "active"
+                                ? "default"
+                                : job.status === "pending"
+                                ? "outline"
+                                : job.status === "expired"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                          >
                             {job.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>{new Date(job.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Link
-                              href={`/admin/jobs/${job.id}`}
-                              className="text-primary hover:text-primary/80"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Link>
-                            <Link
-                              href={`/admin/jobs/${job.id}/edit`}
-                              className="text-primary hover:text-primary/80"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Link>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive/80"
-                              onClick={() => handleDelete(job.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Open menu</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Shield className="mr-2 h-4 w-4" />
+                                {job.status === "active"
+                                  ? "Deactivate"
+                                  : "Activate"}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
