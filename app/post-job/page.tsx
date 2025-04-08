@@ -47,6 +47,7 @@ import { db } from "../config/firebase";
 import { uploadToS3 } from "@/app/utils/aws-config";
 import { v4 as uuidv4 } from "uuid";
 import dynamic from 'next/dynamic';
+import { createTimelineEvent } from '@/lib/firebase';
 
 // Add type declarations for Window interface
 declare global {
@@ -480,177 +481,118 @@ export default function PostJob() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    console.log('Form submitted'); // Debug log
     
-    // Basic validation
-    const errors: Record<string, string> = {};
-    if (!formData.title.trim()) errors.title = "Job title is required";
-    if (!formData.company.trim()) errors.company = "Company name is required";
-    if (!formData.salaryType) errors.salaryType = "Salary type is required";
-    if (!formData.salaryAmount) errors.salaryAmount = "Salary amount is required";
-    if (!formData.positions) errors.positions = "Number of positions is required";
-    if (!formData.gender) errors.gender = "Gender preference is required";
-    if (!formData.category) errors.category = "Job category is required";
-    if (!formData.termsAccepted) errors.termsAccepted = "You must accept the terms and conditions";
-    
-    if (workLocation === "on-site") {
-      if (!formData.address.trim()) errors.address = "Address is required";
-      if (!formData.city.trim()) errors.city = "City is required";
-      if (!formData.state.trim()) errors.state = "State is required";
-      if (!formData.zip.trim()) errors.zip = "ZIP code is required";
-    }
-    
-    // If there are validation errors, show them and stop submission
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      setIsSubmitting(false);
-      // Scroll to the first error
-      const firstErrorField = document.getElementById(Object.keys(errors)[0]);
-      if (firstErrorField) {
-        firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        firstErrorField.focus();
-      }
+    // Prevent multiple submissions
+    if (isSubmitting) {
+      console.log('Already submitting'); // Debug log
       return;
     }
     
+    setIsSubmitting(true);
+    console.log('Starting submission'); // Debug log
+
     try {
-      // Check if user is authenticated
-      if (!user) {
-        toast.error("You must be logged in to post a job");
-        router.push("/login");
+      // Validate required fields
+      const requiredFields = ['title', 'company', 'salaryType', 'salaryAmount', 'positions', 'gender', 'minAge', 'maxAge', 'startDate', 'category', 'jobType', 'hours', 'duration', 'payType'];
+      
+      // Add address fields only if work location is on-site
+      if (workLocation === 'on-site') {
+        requiredFields.push('address', 'city', 'state', 'zip');
+      }
+      
+      const missingFields = requiredFields.filter(field => !formData[field as keyof FormData]);
+      
+      if (missingFields.length > 0) {
+        console.log('Missing fields:', missingFields); // Debug log
+        toast.error(`Please fill in all required fields: ${missingFields.join(', ')}`);
+        setIsSubmitting(false);
         return;
       }
-      
-      // Format contacts data
-      const formattedContacts = contacts.map((contact: Contact, index: number) => {
-        const nameElement = document.getElementById(`contact-name-${index}`) as HTMLInputElement;
-        const phoneElement = document.getElementById(`contact-phone-${index}`) as HTMLInputElement;
-        
-        return {
-          name: nameElement?.value || contact.name || "",
-          phone: phoneElement?.value || contact.phone || "",
-        };
-      }).filter((contact: Contact) => contact.name && contact.phone);
-      
-      // Generate unique job ID
-      const jobId = uuidv4();
-      
-      // Prepare job data
-      const jobData: any = {
-        id: jobId,
-        userId: user.uid,
+
+      // Validate description (either voice or text required)
+      if (!formData.description && !audioBlob) {
+        console.log('No description provided'); // Debug log
+        toast.error('Please provide either a text description or voice description');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!formData.termsAccepted) {
+        console.log('Terms not accepted'); // Debug log
+        toast.error('Please accept the terms and conditions');
+        setIsSubmitting(false);
+        return;
+      }
+
+      console.log('Creating job data'); // Debug log
+      // Create job data object
+      const jobData = {
         title: formData.title,
         company: formData.company,
-        salaryType: formData.salaryType,
-        salaryAmount: parseFloat(formData.salaryAmount),
-        positions: parseInt(formData.positions),
-        gender: formData.gender,
-        ageRange: {
-          min: parseInt(formData.minAge),
-          max: formData.maxAge ? parseInt(formData.maxAge) : null,
-        },
-        startDate: formData.startDate,
-        endDate: formData.endDate || null,
+        clientId: user?.uid,
         description: formData.description,
-        hasAudioDescription: !!audioUrl,
-        hasTextDescription: !!formData.description.trim(),
+        voiceDescription: audioBlob ? {
+          url: audioUrl,
+          duration: recordingTime
+        } : null,
+        location: workLocation === 'on-site' 
+          ? `${formData.address}, ${formData.city}, ${formData.state} ${formData.zip}`
+          : 'Remote',
+        type: formData.jobType,
         category: formData.category,
-        skills: formData.skills ? formData.skills.split(",").map(skill => skill.trim()) : [],
-        jobType: formData.jobType,
-        hours: formData.hours,
+        rate: formData.salaryAmount,
         duration: formData.duration,
-        payType: formData.payType,
+        hours: formData.hours,
+        positionsNeeded: parseInt(formData.positions) || 1,
+        positionsFilled: 0,
+        status: 'draft',
+        flowStatus: 'draft',
+        featured: false,
+        urgent: false,
+        views: 0,
+        requirements: formData.skills.split(',').map(skill => skill.trim()),
+        benefits: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        employerId: user?.uid,
+        draftStatus: 'pending',
+        adminNotes: '',
+        rejectionReason: '',
         workLocation: workLocation,
-        contacts: formattedContacts,
-        applicationInstructions: formData.applicationInstructions,
-        status: "pending", // pending, approved, rejected
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
+        timeline: [{
+          id: uuidv4(),
+          date: new Date().toLocaleDateString(),
+          time: new Date().toLocaleTimeString(),
+          action: 'Job created',
+          icon: 'file-text'
+        }]
       };
-      
-      // Add location data if on-site
-      if (workLocation === "on-site") {
-        jobData.location = {
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zip: formData.zip,
-          coordinates: {
-            lat: location.lat,
-            lng: location.lng,
-          }
-        };
-      }
-      
-      // Upload audio to S3 if exists
-      if (audioBlob) {
-        try {
-          // Create a more robust file object with proper MIME type
-          const fileType = "audio/webm";
-          const fileName = `job-audio-${jobId}.webm`;
-          const audioFile = new File([audioBlob], fileName, { type: fileType });
-          
-          const s3Key = `job-descriptions/${user.uid}/${jobId}-${Date.now()}.webm`;
-          
-          // Log the file details for debugging
-          console.log("Uploading audio file:", {
-            name: audioFile.name,
-            type: audioFile.type,
-            size: audioFile.size
-          });
-          
-          try {
-            const audioFileUrl = await uploadToS3(audioFile, s3Key);
-            console.log("Audio file uploaded successfully:", audioFileUrl);
-            
-            // Add audio data to job data
-            jobData.audioDescription = {
-              url: audioFileUrl,
-              duration: recordingTime,
-              key: s3Key
-            };
-            
-            // Log the full job data with audio URL
-            console.log("Job data with audio:", JSON.stringify(jobData, null, 2));
-          } catch (uploadError) {
-            console.error("Error in S3 upload:", uploadError);
-            toast.error("Error uploading audio: " + (uploadError instanceof Error ? uploadError.message : String(uploadError)));
-            throw uploadError;
-          }
-        } catch (error) {
-          console.error("Error preparing audio:", error);
-          toast.error("Failed to process audio description. Job will be submitted without audio.");
-        }
-      } else {
-        console.log("No audio blob available for upload");
-      }
-      
-      // Save to Firestore with explicit handling
-      try {
-        console.log("Saving job data to Firestore:", JSON.stringify(jobData, null, 2));
-        const jobRef = doc(db, "jobs", jobId);
-        await setDoc(jobRef, jobData);
-        console.log("Job data saved successfully with ID:", jobId);
 
-        // Update user's role to employer
-        const userRef = doc(db, "users", user.uid);
-        await updateDoc(userRef, {
-          role: 'employer',
-          updatedAt: Timestamp.now()
-        });
-        console.log("User role updated to employer");
-      } catch (firestoreError) {
-        console.error("Error saving to Firestore:", firestoreError);
-        toast.error("Failed to save job data. Please try again.");
-        throw firestoreError;
-      }
-      
-      // Success! Redirect to confirmation page
-      toast.success("Job posted successfully! It's now pending review.");
-      router.push("/dashboard/jobs");
+      console.log('Creating job document'); // Debug log
+      // Create job document
+      const jobRef = doc(collection(db, 'jobs'));
+      await setDoc(jobRef, jobData);
+
+      console.log('Creating timeline event'); // Debug log
+      // Create timeline event
+      await createTimelineEvent(jobRef.id, 'Job created');
+
+      console.log('Showing success message'); // Debug log
+      // Show success message
+      toast.success('Job posted successfully!', {
+        description: 'Your job posting has been created and is pending review.',
+        duration: 5000,
+      });
+
+      // Redirect after a short delay
+      setTimeout(() => {
+        console.log('Redirecting to dashboard'); // Debug log
+        router.push('/dashboard/employer/jobs');
+      }, 2000);
     } catch (error) {
-      console.error("Error submitting job:", error);
-      toast.error("Failed to submit job. Please try again.");
+      console.error('Error posting job:', error);
+      toast.error('Failed to post job. Please try again.');
       setIsSubmitting(false);
     }
   };
@@ -869,7 +811,7 @@ export default function PostJob() {
             Fill out the form below to post your part-time job opportunity.
           </p>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="space-y-6">
             <Card className="mb-8">
               <CardHeader>
                 <CardTitle>Job Details</CardTitle>
@@ -1042,13 +984,14 @@ export default function PostJob() {
                 <CardTitle>Job Description</CardTitle>
                 <CardDescription>
                   Provide a detailed description of the job responsibilities and requirements.
+                  You can provide either a text description, voice description, or both.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4">
                   <div className="border rounded-md p-4 bg-muted/30">
                     <div className="mb-4">
-                      <h4 className="text-sm font-medium mb-2">Voice Description</h4>
+                      <h4 className="text-sm font-medium mb-2">Voice Description (Optional)</h4>
                       <p className="text-xs text-muted-foreground mb-4">
                         Record a voice description of the job (max 2 minutes). This helps applicants better understand the role.
                       </p>
@@ -1178,7 +1121,7 @@ export default function PostJob() {
                     </div>
                     
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Text Description</h4>
+                      <h4 className="text-sm font-medium mb-2">Text Description (Optional)</h4>
                       <p className="text-xs text-muted-foreground mb-2">
                         Provide a detailed written description of the job. Include responsibilities, requirements, and any other relevant information.
                       </p>
@@ -1389,8 +1332,7 @@ export default function PostJob() {
               <CardHeader>
                 <CardTitle>Location & Contact</CardTitle>
                 <CardDescription>
-                  Provide location details and how applicants should contact
-                  you.
+                  Provide location details and how applicants should contact you.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -1651,7 +1593,9 @@ export default function PostJob() {
                     id="terms" 
                     required
                     checked={formData.termsAccepted}
-                    onCheckedChange={handleCheckboxChange}
+                    onCheckedChange={(checked) => {
+                      setFormData(prev => ({ ...prev, termsAccepted: checked as boolean }));
+                    }}
                     className={formErrors.termsAccepted ? "border-red-500" : ""}
                   />
                   <Label htmlFor="terms" className="font-normal">
@@ -1673,10 +1617,15 @@ export default function PostJob() {
                   variant="outline"
                   type="button"
                   onClick={() => router.push("/")}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="min-w-[120px]"
+                >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
