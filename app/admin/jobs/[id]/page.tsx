@@ -12,6 +12,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   ArrowLeft,
   Briefcase,
@@ -27,6 +36,8 @@ import {
   Shield,
   Trash2,
   User,
+  Users,
+  Wallet,
 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
@@ -144,31 +155,44 @@ const jobData = {
       icon: <CheckCircle className="h-4 w-4" />,
     },
   ],
-  flowStatus: "active", // Can be: draft, pending, active, paused, filled, expired, closed
+  flowStatus: "active", // Can be: draft, pending-approval, active, filling, completed, payment-pending, payment-distributed
   flowProgress: 60, // Percentage of completion in the job lifecycle
+  positionsNeeded: 3, // Number of positions needed to be filled
+  positionsFilled: 1, // Number of positions already filled
+  draftDetails: {
+    submittedBy: "John Smith",
+    submittedDate: "May 10, 2023",
+    lastEdited: "May 11, 2023",
+    adminNotes: "Please review the job description and requirements carefully.",
+    status: "pending", // pending, approved, rejected
+    rejectionReason: "",
+  }
 }
 
 export default function AdminJobDetail() {
   const router = useRouter()
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const [adminNotes, setAdminNotes] = useState(jobData.draftDetails.adminNotes)
+  const [rejectionReason, setRejectionReason] = useState(jobData.draftDetails.rejectionReason)
 
   // Function to get status color
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case "draft":
         return "bg-muted"
-      case "pending":
+      case "pending-approval":
         return "bg-yellow-500"
       case "active":
         return "bg-green-500"
-      case "paused":
-        return "bg-orange-500"
-      case "filled":
+      case "filling":
         return "bg-blue-500"
-      case "expired":
-        return "bg-red-500"
-      case "closed":
-        return "bg-gray-500"
+      case "completed":
+        return "bg-purple-500"
+      case "payment-pending":
+        return "bg-orange-500"
+      case "payment-distributed":
+        return "bg-green-500"
       default:
         return "bg-muted"
     }
@@ -297,6 +321,95 @@ export default function AdminJobDetail() {
 
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
+              {/* Draft Review Section - Only show when job is in draft or pending approval */}
+              {(jobData.flowStatus === "draft" || jobData.flowStatus === "pending-approval") && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Draft Review</CardTitle>
+                    <CardDescription>Review and approve this job posting</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Submitted By</p>
+                        <p className="font-medium">{jobData.draftDetails.submittedBy}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Submitted Date</p>
+                        <p className="font-medium">{jobData.draftDetails.submittedDate}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Last Edited</p>
+                        <p className="font-medium">{jobData.draftDetails.lastEdited}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Current Status</p>
+                        <Badge variant={jobData.draftDetails.status === "pending" ? "outline" : jobData.draftDetails.status === "approved" ? "default" : "destructive"}>
+                          {jobData.draftDetails.status}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-medium">Admin Notes</label>
+                        {isEditing ? (
+                          <Textarea
+                            value={adminNotes}
+                            onChange={(e) => setAdminNotes(e.target.value)}
+                            className="mt-2"
+                            placeholder="Add your notes here..."
+                          />
+                        ) : (
+                          <p className="text-sm text-muted-foreground mt-2">{adminNotes}</p>
+                        )}
+                      </div>
+
+                      {jobData.draftDetails.status === "rejected" && (
+                        <div>
+                          <label className="text-sm font-medium">Rejection Reason</label>
+                          {isEditing ? (
+                            <Textarea
+                              value={rejectionReason}
+                              onChange={(e) => setRejectionReason(e.target.value)}
+                              className="mt-2"
+                              placeholder="Add rejection reason..."
+                            />
+                          ) : (
+                            <p className="text-sm text-muted-foreground mt-2">{rejectionReason}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-4">
+                      {isEditing ? (
+                        <>
+                          <Button onClick={() => setIsEditing(false)} variant="outline">
+                            Cancel
+                          </Button>
+                          <Button onClick={() => setIsEditing(false)}>
+                            Save Changes
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button onClick={() => setIsEditing(true)} variant="outline">
+                            Edit Notes
+                          </Button>
+                          <Button variant="outline" className="text-green-600 hover:text-green-600">
+                            Approve Job
+                          </Button>
+                          <Button variant="outline" className="text-red-600 hover:text-red-600">
+                            Reject Job
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Job Status Flow Chart */}
               <Card>
                 <CardHeader>
@@ -304,105 +417,264 @@ export default function AdminJobDetail() {
                   <CardDescription>Current status and progress of this job posting</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="mb-4">
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm">Job Lifecycle Progress</span>
-                      <span className="text-sm font-medium">{jobData.flowProgress}%</span>
-                    </div>
-                    <Progress value={jobData.flowProgress} className="h-2" />
-                  </div>
-
                   {/* Flow Chart */}
                   <div className="relative py-6">
                     <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-muted -translate-y-1/2" />
                     <div className="relative flex justify-between">
                       {/* Draft */}
                       <div className="flex flex-col items-center">
-                        <div
-                          className={`z-10 w-8 h-8 rounded-full flex items-center justify-center ${
-                            jobData.flowStatus === "draft"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          <FileText className="h-4 w-4" />
+                        <div className="relative">
+                          <div
+                            className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              jobData.flowStatus === "draft"
+                                ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
+                                : jobData.flowStatus !== "draft"
+                                ? "bg-green-500 text-white"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {jobData.flowStatus !== "draft" ? (
+                              <CheckCircle className="h-5 w-5" />
+                            ) : (
+                              <FileText className="h-5 w-5" />
+                            )}
+                          </div>
                         </div>
-                        <span className="text-xs mt-2">Draft</span>
+                        <span className={`text-xs mt-2 font-medium ${jobData.flowStatus === "draft" ? "text-primary" : "text-muted-foreground"}`}>
+                          Draft
+                        </span>
                       </div>
 
-                      {/* Pending */}
+                      {/* Pending Approval */}
                       <div className="flex flex-col items-center">
-                        <div
-                          className={`z-10 w-8 h-8 rounded-full flex items-center justify-center ${
-                            jobData.flowStatus === "pending"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          <Clock className="h-4 w-4" />
+                        <div className="relative">
+                          <div
+                            className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              jobData.flowStatus === "pending-approval"
+                                ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
+                                : ["active", "filling", "completed", "payment-pending", "payment-distributed"].includes(jobData.flowStatus)
+                                ? "bg-green-500 text-white"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {["active", "filling", "completed", "payment-pending", "payment-distributed"].includes(jobData.flowStatus) ? (
+                              <CheckCircle className="h-5 w-5" />
+                            ) : (
+                              <Shield className="h-5 w-5" />
+                            )}
+                          </div>
                         </div>
-                        <span className="text-xs mt-2">Pending</span>
+                        <span className={`text-xs mt-2 font-medium ${jobData.flowStatus === "pending-approval" ? "text-primary" : "text-muted-foreground"}`}>
+                          Pending Approval
+                        </span>
                       </div>
 
                       {/* Active */}
                       <div className="flex flex-col items-center">
-                        <div
-                          className={`z-10 w-8 h-8 rounded-full flex items-center justify-center ${
-                            jobData.flowStatus === "active"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          <CheckCircle className="h-4 w-4" />
+                        <div className="relative">
+                          <div
+                            className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              jobData.flowStatus === "active"
+                                ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
+                                : ["filling", "completed", "payment-pending", "payment-distributed"].includes(jobData.flowStatus)
+                                ? "bg-green-500 text-white"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {["filling", "completed", "payment-pending", "payment-distributed"].includes(jobData.flowStatus) ? (
+                              <CheckCircle className="h-5 w-5" />
+                            ) : (
+                              <CheckCircle className="h-5 w-5" />
+                            )}
+                          </div>
                         </div>
-                        <span className="text-xs mt-2">Active</span>
+                        <span className={`text-xs mt-2 font-medium ${jobData.flowStatus === "active" ? "text-primary" : "text-muted-foreground"}`}>
+                          Active
+                        </span>
                       </div>
 
-                      {/* Filled */}
+                      {/* Filling */}
                       <div className="flex flex-col items-center">
-                        <div
-                          className={`z-10 w-8 h-8 rounded-full flex items-center justify-center ${
-                            jobData.flowStatus === "filled"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          <User className="h-4 w-4" />
+                        <div className="relative">
+                          <div
+                            className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              jobData.flowStatus === "filling"
+                                ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
+                                : ["completed", "payment-pending", "payment-distributed"].includes(jobData.flowStatus)
+                                ? "bg-green-500 text-white"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {["completed", "payment-pending", "payment-distributed"].includes(jobData.flowStatus) ? (
+                              <CheckCircle className="h-5 w-5" />
+                            ) : (
+                              <Users className="h-5 w-5" />
+                            )}
+                          </div>
+                          {["filling", "completed", "payment-pending", "payment-distributed"].includes(jobData.flowStatus) && (
+                            <div className="absolute -bottom-1 -right-1 bg-primary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                              {jobData.positionsFilled}/{jobData.positionsNeeded}
+                            </div>
+                          )}
                         </div>
-                        <span className="text-xs mt-2">Filled</span>
+                        <span className={`text-xs mt-2 font-medium ${jobData.flowStatus === "filling" ? "text-primary" : "text-muted-foreground"}`}>
+                          Filling
+                        </span>
                       </div>
 
-                      {/* Closed */}
+                      {/* Completed */}
                       <div className="flex flex-col items-center">
-                        <div
-                          className={`z-10 w-8 h-8 rounded-full flex items-center justify-center ${
-                            jobData.flowStatus === "closed" || jobData.flowStatus === "expired"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          <Briefcase className="h-4 w-4" />
+                        <div className="relative">
+                          <div
+                            className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              jobData.flowStatus === "completed"
+                                ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
+                                : ["payment-pending", "payment-distributed"].includes(jobData.flowStatus)
+                                ? "bg-green-500 text-white"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {["payment-pending", "payment-distributed"].includes(jobData.flowStatus) ? (
+                              <CheckCircle className="h-5 w-5" />
+                            ) : (
+                              <Briefcase className="h-5 w-5" />
+                            )}
+                          </div>
                         </div>
-                        <span className="text-xs mt-2">Closed</span>
+                        <span className={`text-xs mt-2 font-medium ${jobData.flowStatus === "completed" ? "text-primary" : "text-muted-foreground"}`}>
+                          Completed
+                        </span>
                       </div>
+
+                      {/* Payment Pending */}
+                      <div className="flex flex-col items-center">
+                        <div className="relative">
+                          <div
+                            className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              jobData.flowStatus === "payment-pending"
+                                ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
+                                : jobData.flowStatus === "payment-distributed"
+                                ? "bg-green-500 text-white"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {jobData.flowStatus === "payment-distributed" ? (
+                              <CheckCircle className="h-5 w-5" />
+                            ) : (
+                              <DollarSign className="h-5 w-5" />
+                            )}
+                          </div>
+                        </div>
+                        <span className={`text-xs mt-2 font-medium ${jobData.flowStatus === "payment-pending" ? "text-primary" : "text-muted-foreground"}`}>
+                          Payment Pending
+                        </span>
+                      </div>
+
+                      {/* Payment Distributed */}
+                      <div className="flex flex-col items-center">
+                        <div className="relative">
+                          <div
+                            className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              jobData.flowStatus === "payment-distributed"
+                                ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            <Wallet className="h-5 w-5" />
+                          </div>
+                        </div>
+                        <span className={`text-xs mt-2 font-medium ${jobData.flowStatus === "payment-distributed" ? "text-primary" : "text-muted-foreground"}`}>
+                          Payment Distributed
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Connections */}
+                    <div className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2">
+                      <div 
+                        className={`h-full bg-primary transition-all duration-300`}
+                        style={{
+                          width: `${(() => {
+                            const states = ["draft", "pending-approval", "active", "filling", "completed", "payment-pending", "payment-distributed"];
+                            const currentIndex = states.indexOf(jobData.flowStatus);
+                            // Calculate the width based on the number of completed steps
+                            return (currentIndex / (states.length - 1)) * 100;
+                          })()}%`
+                        }}
+                      />
                     </div>
                   </div>
 
-                  <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-muted/50 p-4 rounded-lg">
-                      <div className="text-sm text-muted-foreground">Applications</div>
-                      <div className="text-2xl font-bold mt-1">{jobData.applications}</div>
+                  {/* Status Details */}
+                  <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-4">
+                      <div className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
+                        jobData.flowStatus === "draft" ? "bg-primary/10" : ""
+                      }`}>
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <FileText className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Draft</h4>
+                          <p className="text-sm text-muted-foreground">Job is being created and edited</p>
+                        </div>
+                      </div>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
+                        jobData.flowStatus === "pending-approval" ? "bg-primary/10" : ""
+                      }`}>
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Shield className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Pending Approval</h4>
+                          <p className="text-sm text-muted-foreground">Waiting for admin review</p>
+                        </div>
+                      </div>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
+                        jobData.flowStatus === "active" ? "bg-primary/10" : ""
+                      }`}>
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <CheckCircle className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Active</h4>
+                          <p className="text-sm text-muted-foreground">Job is live and accepting applications</p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="bg-muted/50 p-4 rounded-lg">
-                      <div className="text-sm text-muted-foreground">Views</div>
-                      <div className="text-2xl font-bold mt-1">{jobData.views}</div>
-                    </div>
-                    <div className="bg-muted/50 p-4 rounded-lg">
-                      <div className="text-sm text-muted-foreground">Days Active</div>
-                      <div className="text-2xl font-bold mt-1">
-                        {Math.floor(
-                          (new Date().getTime() - new Date(jobData.postedDate).getTime()) / (1000 * 60 * 60 * 24),
-                        )}
+                    <div className="space-y-4">
+                      <div className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
+                        jobData.flowStatus === "filling" ? "bg-primary/10" : ""
+                      }`}>
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Users className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Filling</h4>
+                          <p className="text-sm text-muted-foreground">Candidates are being selected</p>
+                        </div>
+                      </div>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
+                        jobData.flowStatus === "completed" ? "bg-primary/10" : ""
+                      }`}>
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Briefcase className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Completed</h4>
+                          <p className="text-sm text-muted-foreground">Job has been filled</p>
+                        </div>
+                      </div>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
+                        jobData.flowStatus === "payment-pending" || jobData.flowStatus === "payment-distributed" ? "bg-primary/10" : ""
+                      }`}>
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <DollarSign className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Payment</h4>
+                          <p className="text-sm text-muted-foreground">Payment from owner and distribution</p>
+                        </div>
                       </div>
                     </div>
                   </div>
