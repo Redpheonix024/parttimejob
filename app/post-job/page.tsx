@@ -493,6 +493,11 @@ export default function PostJob() {
     if (!formData.category) errors.category = "Job category is required";
     if (!formData.termsAccepted) errors.termsAccepted = "You must accept the terms and conditions";
     
+    // Add validation for description (either voice or text)
+    if (!audioUrl && !formData.description.trim()) {
+      errors.description = "Please provide either a voice or text description";
+    }
+    
     if (workLocation === "on-site") {
       if (!formData.address.trim()) errors.address = "Address is required";
       if (!formData.city.trim()) errors.city = "City is required";
@@ -1189,6 +1194,9 @@ export default function PostJob() {
                         onChange={handleChange}
                         className={`min-h-[150px] ${formErrors.description ? "border-red-500" : ""}`}
                       />
+                      {formErrors.description && (
+                        <p className="text-red-500 text-xs mt-1">{formErrors.description}</p>
+                      )}
                       {audioUrl && (
                         <p className="text-xs text-amber-600 mt-1">
                           You have provided both a voice and text description. Both will be available to applicants.

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
-import { doc, getDoc, collection, query, where, getDocs, DocumentData, QueryDocumentSnapshot, Timestamp } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs, DocumentData, QueryDocumentSnapshot, Timestamp, updateDoc, addDoc } from "firebase/firestore"
 import { db } from "@/app/config/firebase"
 import { format } from "date-fns"
 import AdminSidebar from "@/components/layout/admin-sidebar"
@@ -32,6 +32,9 @@ import {
   User,
   Users,
   Wallet,
+  Mic,
+  Play,
+  Download,
 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
@@ -43,6 +46,33 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 // Add these interfaces at the top of the file after imports
 interface JobData {
@@ -91,6 +121,17 @@ interface JobData {
   flowProgress: number
   positionsNeeded: number
   positionsFilled: number
+  gender?: string
+  minAge?: number
+  maxAge?: number
+  hours?: string
+  payType?: string
+  applicationInstructions?: string
+  skills?: string
+  audioDescription?: {
+    url: string
+    duration: string
+  }
 }
 
 interface UserData {
@@ -101,6 +142,14 @@ interface UserData {
   phone?: string
   photoURL?: string
 }
+
+// Update the schema to remove email
+const manualApplicantSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  phone: z.string().min(10, "Phone number must be at least 10 digits"),
+})
+
+type ManualApplicantFormValues = z.infer<typeof manualApplicantSchema>
 
 // Helper function to safely convert Firebase Timestamp to Date
 const convertTimestampToDate = (timestamp: any) => {
@@ -120,6 +169,27 @@ export default function AdminJobDetail() {
   const [jobData, setJobData] = useState<JobData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isApproving, setIsApproving] = useState(false)
+  const [isPosting, setIsPosting] = useState(false)
+  const [isAddingApplicant, setIsAddingApplicant] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isHiring, setIsHiring] = useState(false)
+  const [isRemovingHire, setIsRemovingHire] = useState(false)
+  const [isMarkingWorkFinished, setIsMarkingWorkFinished] = useState(false)
+  const [isMarkingPaymentReceived, setIsMarkingPaymentReceived] = useState(false)
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false)
+  const [selectedApplicant, setSelectedApplicant] = useState<JobData['applicants'][0] | null>(null)
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
+  const [distributedPayments, setDistributedPayments] = useState<string[]>([])
+  const [isUndoing, setIsUndoing] = useState(false)
+
+  const form = useForm<ManualApplicantFormValues>({
+    resolver: zodResolver(manualApplicantSchema),
+    defaultValues: {
+      name: "",
+      phone: "",
+    },
+  })
 
   useEffect(() => {
     const fetchJobData = async () => {
@@ -153,6 +223,20 @@ export default function AdminJobDetail() {
         const applicants = await Promise.all(
           applicantsSnapshot.docs.map(async (applicantDoc: QueryDocumentSnapshot<DocumentData>) => {
             const data = applicantDoc.data()
+            // For manual applicants, use the name directly from the application
+            if (data.isManual) {
+              return {
+                id: applicantDoc.id,
+                name: data.name,
+                email: data.email || "",
+                appliedDate: data.createdAt 
+                  ? format(convertTimestampToDate(data.createdAt), "MMM d, yyyy")
+                  : "N/A",
+                status: data.status || "Applied",
+                avatar: "/placeholder.svg?height=32&width=32",
+              }
+            }
+            // For regular applicants, fetch user data
             const userDocRef = doc(db, "users", data.userId)
             const userDoc = await getDoc(userDocRef)
             const userData = userDoc.exists() ? userDoc.data() as UserData : null
@@ -213,6 +297,14 @@ export default function AdminJobDetail() {
           flowProgress: job.flowProgress || 0,
           positionsNeeded: job.positionsNeeded || 1,
           positionsFilled: job.positionsFilled || 0,
+          gender: job.gender || undefined,
+          minAge: job.minAge || undefined,
+          maxAge: job.maxAge || undefined,
+          hours: job.hours || undefined,
+          payType: job.payType || undefined,
+          applicationInstructions: job.applicationInstructions || undefined,
+          skills: job.skills || undefined,
+          audioDescription: job.audioDescription || undefined,
         }
 
         setJobData(transformedData)
@@ -229,6 +321,342 @@ export default function AdminJobDetail() {
       fetchJobData()
     }
   }, [params.id]) // Use params.id in the dependency array
+
+  const handleApproveDraft = async () => {
+    try {
+      setIsApproving(true)
+      const jobRef = doc(db, "jobs", params.id as string)
+      await updateDoc(jobRef, {
+        flowStatus: "pending-approval",
+        status: "Pending",
+        updatedAt: new Date()
+      })
+      
+      // Update local state
+      setJobData(prev => prev ? {
+        ...prev,
+        flowStatus: "pending-approval",
+        status: "Pending"
+      } : null)
+      
+      toast.success("Job draft approved successfully")
+    } catch (error) {
+      console.error("Error approving draft:", error)
+      toast.error("Failed to approve draft")
+    } finally {
+      setIsApproving(false)
+    }
+  }
+
+  const handlePostJob = async () => {
+    try {
+      setIsPosting(true)
+      const jobRef = doc(db, "jobs", params.id as string)
+      await updateDoc(jobRef, {
+        flowStatus: "active",
+        status: "Active",
+        updatedAt: new Date(),
+        publishedAt: new Date()
+      })
+      
+      // Update local state
+      setJobData(prev => prev ? {
+        ...prev,
+        flowStatus: "active",
+        status: "Active"
+      } : null)
+      
+      toast.success("Job posted successfully")
+    } catch (error) {
+      console.error("Error posting job:", error)
+      toast.error("Failed to post job")
+    } finally {
+      setIsPosting(false)
+    }
+  }
+
+  const handleAddManualApplicant = async (data: ManualApplicantFormValues) => {
+    try {
+      setIsAddingApplicant(true)
+      
+      // Add applicant to applications collection
+      const applicationRef = await addDoc(collection(db, "applications"), {
+        jobId: params.id,
+        userId: "manual", // Special identifier for manually added applicants
+        name: data.name,
+        phone: data.phone,
+        status: "Applied",
+        createdAt: new Date(),
+        isManual: true,
+      })
+
+      // Update local state
+      setJobData(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          applicants: [
+            ...prev.applicants,
+            {
+              id: applicationRef.id,
+              name: data.name,
+              email: "", // Empty email for manual applicants
+              appliedDate: format(new Date(), "MMM d, yyyy"),
+              status: "Applied",
+              avatar: "/placeholder.svg?height=32&width=32",
+            }
+          ]
+        }
+      })
+
+      toast.success("Applicant added successfully")
+      setIsDialogOpen(false)
+      form.reset()
+    } catch (error) {
+      console.error("Error adding manual applicant:", error)
+      toast.error("Failed to add applicant")
+    } finally {
+      setIsAddingApplicant(false)
+    }
+  }
+
+  const handleHireApplicant = async (applicantId: string) => {
+    try {
+      setIsHiring(true)
+      
+      // Update application status
+      const applicationRef = doc(db, "applications", applicantId)
+      await updateDoc(applicationRef, {
+        status: "Hired",
+        updatedAt: new Date()
+      })
+
+      // Update job status and positions filled
+      const jobRef = doc(db, "jobs", params.id as string)
+      const newPositionsFilled = (jobData?.positionsFilled || 0) + 1
+      const isFilled = newPositionsFilled >= (jobData?.positionsNeeded || 1)
+      
+      await updateDoc(jobRef, {
+        flowStatus: isFilled ? "completed" : "filling",
+        positionsFilled: newPositionsFilled,
+        updatedAt: new Date()
+      })
+
+      // Update local state
+      setJobData(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          flowStatus: isFilled ? "completed" : "filling",
+          positionsFilled: newPositionsFilled,
+          applicants: prev.applicants.map(applicant => 
+            applicant.id === applicantId 
+              ? { ...applicant, status: "Hired" }
+              : applicant
+          )
+        }
+      })
+
+      toast.success("Applicant hired successfully")
+    } catch (error) {
+      console.error("Error hiring applicant:", error)
+      toast.error("Failed to hire applicant")
+    } finally {
+      setIsHiring(false)
+    }
+  }
+
+  const handleRemoveHire = async (applicantId: string) => {
+    try {
+      setIsRemovingHire(true)
+      
+      // Update application status
+      const applicationRef = doc(db, "applications", applicantId)
+      await updateDoc(applicationRef, {
+        status: "Applied",
+        updatedAt: new Date()
+      })
+
+      // Update job status and positions filled
+      const jobRef = doc(db, "jobs", params.id as string)
+      const newPositionsFilled = Math.max(0, (jobData?.positionsFilled || 0) - 1)
+      
+      await updateDoc(jobRef, {
+        flowStatus: newPositionsFilled === 0 ? "active" : "filling",
+        positionsFilled: newPositionsFilled,
+        updatedAt: new Date()
+      })
+
+      // Update local state
+      setJobData(prev => {
+        if (!prev) return null
+        return {
+          ...prev,
+          flowStatus: newPositionsFilled === 0 ? "active" : "filling",
+          positionsFilled: newPositionsFilled,
+          applicants: prev.applicants.map(applicant => 
+            applicant.id === applicantId 
+              ? { ...applicant, status: "Applied" }
+              : applicant
+          )
+        }
+      })
+
+      toast.success("Hiring status removed successfully")
+    } catch (error) {
+      console.error("Error removing hire status:", error)
+      toast.error("Failed to remove hire status")
+    } finally {
+      setIsRemovingHire(false)
+    }
+  }
+
+  const handleMarkWorkFinished = async () => {
+    try {
+      setIsMarkingWorkFinished(true)
+      const jobRef = doc(db, "jobs", params.id as string)
+      await updateDoc(jobRef, {
+        flowStatus: "work-finished",
+        updatedAt: new Date()
+      })
+      
+      // Update local state
+      setJobData(prev => prev ? {
+        ...prev,
+        flowStatus: "work-finished"
+      } : null)
+      
+      toast.success("Job marked as work finished")
+    } catch (error) {
+      console.error("Error marking work as finished:", error)
+      toast.error("Failed to mark work as finished")
+    } finally {
+      setIsMarkingWorkFinished(false)
+    }
+  }
+
+  const handleMarkPaymentReceived = async () => {
+    try {
+      setIsMarkingPaymentReceived(true)
+      const jobRef = doc(db, "jobs", params.id as string)
+      await updateDoc(jobRef, {
+        flowStatus: "payment-pending",
+        updatedAt: new Date()
+      })
+      
+      // Update local state
+      setJobData(prev => prev ? {
+        ...prev,
+        flowStatus: "payment-pending"
+      } : null)
+      
+      toast.success("Payment marked as received")
+    } catch (error) {
+      console.error("Error marking payment as received:", error)
+      toast.error("Failed to mark payment as received")
+    } finally {
+      setIsMarkingPaymentReceived(false)
+    }
+  }
+
+  const handleCheckPaymentDistribution = (applicant: JobData['applicants'][0]) => {
+    setSelectedApplicant(applicant)
+    setIsPaymentDialogOpen(true)
+  }
+
+  const handleMarkPaymentDistributed = async () => {
+    if (!selectedApplicant) return
+
+    try {
+      setIsCheckingPayment(true)
+      
+      // Add the applicant's ID to the distributed payments list
+      const newDistributedPayments = [...distributedPayments, selectedApplicant.id]
+      setDistributedPayments(newDistributedPayments)
+
+      // Check if all hired applicants have received payment
+      const allHiredApplicants = jobData?.applicants.filter(a => a.status === "Hired") || []
+      const allPaymentsDistributed = allHiredApplicants.every(a => newDistributedPayments.includes(a.id))
+
+      // Update job status if all payments are distributed
+      if (allPaymentsDistributed) {
+        const jobRef = doc(db, "jobs", params.id as string)
+        await updateDoc(jobRef, {
+          flowStatus: "payment-distributed",
+          updatedAt: new Date()
+        })
+        
+        // Update local state
+        setJobData(prev => prev ? {
+          ...prev,
+          flowStatus: "payment-distributed"
+        } : null)
+      }
+      
+      toast.success("Payment marked as distributed")
+      setIsPaymentDialogOpen(false)
+    } catch (error) {
+      console.error("Error marking payment as distributed:", error)
+      toast.error("Failed to mark payment as distributed")
+    } finally {
+      setIsCheckingPayment(false)
+    }
+  }
+
+  const handleUndoStatus = async () => {
+    if (!jobData) return
+
+    try {
+      setIsUndoing(true)
+      const jobRef = doc(db, "jobs", params.id as string)
+      
+      // Determine the previous status based on current status
+      let previousStatus = "draft"
+      switch (jobData.flowStatus) {
+        case "pending-approval":
+          previousStatus = "draft"
+          break
+        case "active":
+          previousStatus = "pending-approval"
+          break
+        case "filling":
+          previousStatus = "active"
+          break
+        case "completed":
+          previousStatus = "filling"
+          break
+        case "work-finished":
+          previousStatus = "completed"
+          break
+        case "payment-pending":
+          previousStatus = "work-finished"
+          break
+        case "payment-distributed":
+          previousStatus = "payment-pending"
+          break
+        default:
+          previousStatus = "draft"
+      }
+
+      await updateDoc(jobRef, {
+        flowStatus: previousStatus,
+        updatedAt: new Date()
+      })
+
+      // Update local state
+      setJobData(prev => prev ? {
+        ...prev,
+        flowStatus: previousStatus
+      } : null)
+
+      toast.success("Status reverted successfully")
+    } catch (error) {
+      console.error("Error reverting status:", error)
+      toast.error("Failed to revert status")
+    } finally {
+      setIsUndoing(false)
+    }
+  }
 
   // Function to get status color
   const getStatusColor = (status: string) => {
@@ -310,11 +738,8 @@ export default function AdminJobDetail() {
         activeLink="jobs"
         onLogout={() => router.push("/admin/login")}
       />
-
-      {/* Main content */}
       <div className="flex-1 min-w-0 overflow-auto">
         <AdminHeader toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
-
         <main className="container mx-auto px-4 py-8">
           <div className="flex items-center gap-2 mb-6">
             <Button variant="ghost" size="icon" asChild>
@@ -372,27 +797,161 @@ export default function AdminJobDetail() {
 
                 <Separator />
 
-                <div>
-                  <h3 className="font-medium mb-2">Description</h3>
-                  <p className="text-sm text-muted-foreground">{jobData.description}</p>
-                </div>
+                {/* Detailed Job Information */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-medium mb-2">Job Details</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Job Type</p>
+                        <p className="font-medium">{jobData.type}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Category</p>
+                        <p className="font-medium">{jobData.category}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Positions Needed</p>
+                        <p className="font-medium">{jobData.positionsNeeded}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Positions Filled</p>
+                        <p className="font-medium">{jobData.positionsFilled}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Gender Preference</p>
+                        <p className="font-medium">{jobData.gender || "No preference"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Age Range</p>
+                        <p className="font-medium">
+                          {jobData.minAge && jobData.maxAge 
+                            ? `${jobData.minAge} - ${jobData.maxAge} years`
+                            : "No age restriction"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Work Hours</p>
+                        <p className="font-medium">{jobData.hours || "Not specified"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Pay Type</p>
+                        <p className="font-medium">{jobData.payType || "Not specified"}</p>
+                      </div>
+                    </div>
+                  </div>
 
-                <div>
-                  <h3 className="font-medium mb-2">Requirements</h3>
-                  <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
-                    {jobData.requirements.map((req: string, index: number) => (
-                      <li key={index}>{req}</li>
-                    ))}
-                  </ul>
-                </div>
+                  <div>
+                    <h3 className="font-medium mb-2">Job Description</h3>
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">{jobData.description}</p>
+                  </div>
 
-                <div>
-                  <h3 className="font-medium mb-2">Benefits</h3>
-                  <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
-                    {jobData.benefits.map((benefit: string, index: number) => (
-                      <li key={index}>{benefit}</li>
-                    ))}
-                  </ul>
+                  {/* Voice Description Section */}
+                  {jobData.audioDescription && (
+                    <div className="space-y-4">
+                      <h3 className="font-medium mb-2">Voice Description</h3>
+                      <div className="flex items-center gap-3">
+                        <div className="w-full bg-muted/30 p-4 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Mic className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-medium">Voice Recording</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  const audio = document.querySelector('audio') as HTMLAudioElement;
+                                  if (audio) {
+                                    audio.paused ? audio.play() : audio.pause();
+                                  }
+                                }}
+                              >
+                                <Play className="h-4 w-4" />
+                              </Button>
+                              <a
+                                href={jobData.audioDescription.url}
+                                download
+                                className="text-muted-foreground hover:text-primary"
+                              >
+                                <Download className="h-4 w-4" />
+                              </a>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <audio 
+                              controls 
+                              className="flex-1 h-10 [&::-webkit-media-controls-panel]:bg-muted/50 [&::-webkit-media-controls-current-time-display]:text-xs [&::-webkit-media-controls-time-remaining-display]:text-xs"
+                              onError={(e) => {
+                                const audioElement = e.target as HTMLAudioElement;
+                                const errorContainer = audioElement.parentElement?.querySelector('.audio-error');
+                                if (errorContainer) {
+                                  errorContainer.textContent = 'Failed to load audio. Please try again later.';
+                                }
+                              }}
+                            >
+                              <source src={jobData.audioDescription.url} type="audio/webm" />
+                              Your browser does not support the audio element.
+                            </audio>
+                          </div>
+                          <div className="flex items-center justify-between mt-2">
+                            <div className="text-xs text-muted-foreground">
+                              Duration: {jobData.audioDescription.duration} seconds
+                            </div>
+                            <div className="audio-error text-xs text-destructive"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <div>
+                    <h3 className="font-medium mb-2">Requirements</h3>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
+                      {jobData.requirements.map((req: string, index: number) => (
+                        <li key={index}>{req}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="font-medium mb-2">Benefits</h3>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
+                      {jobData.benefits.map((benefit: string, index: number) => (
+                        <li key={index}>{benefit}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="font-medium mb-2">Application Instructions</h3>
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">{jobData.applicationInstructions}</p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-medium mb-2">Skills Required</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {jobData.skills && (
+                        typeof jobData.skills === 'string' 
+                          ? jobData.skills.split(',').map((skill: string, index: number) => (
+                              <Badge key={index} variant="secondary">
+                                {skill.trim()}
+                              </Badge>
+                            ))
+                          : Array.isArray(jobData.skills) 
+                            ? jobData.skills.map((skill: string, index: number) => (
+                                <Badge key={index} variant="secondary">
+                                  {skill.trim()}
+                                </Badge>
+                              ))
+                            : null
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <Separator />
@@ -528,7 +1087,7 @@ export default function AdminJobDetail() {
                               <Users className="h-5 w-5" />
                             )}
                           </div>
-                          {jobData.flowStatus === "filling" && (
+                          {(jobData.flowStatus === "filling" || jobData.flowStatus === "completed") && (
                             <div className="absolute -bottom-1 -right-1 bg-primary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                               {jobData.positionsFilled}/{jobData.positionsNeeded}
                             </div>
@@ -546,12 +1105,12 @@ export default function AdminJobDetail() {
                             className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
                               jobData.flowStatus === "completed"
                                 ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
-                                : ["payment-pending", "payment-distributed"].includes(jobData.flowStatus)
+                                : ["work-finished", "payment-pending", "payment-distributed"].includes(jobData.flowStatus)
                                 ? "bg-green-500 text-white"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                            {["payment-pending", "payment-distributed"].includes(jobData.flowStatus) ? (
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {["work-finished", "payment-pending", "payment-distributed"].includes(jobData.flowStatus) ? (
                               <CheckCircle className="h-5 w-5" />
                             ) : (
                               <Briefcase className="h-5 w-5" />
@@ -560,6 +1119,30 @@ export default function AdminJobDetail() {
                         </div>
                         <span className={`text-xs mt-2 font-medium ${jobData.flowStatus === "completed" ? "text-primary" : "text-muted-foreground"}`}>
                           Completed
+                        </span>
+                      </div>
+
+                      {/* Work Finished */}
+                      <div className="flex flex-col items-center">
+                        <div className="relative">
+                          <div
+                            className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              jobData.flowStatus === "work-finished"
+                                ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
+                                : ["payment-pending", "payment-distributed"].includes(jobData.flowStatus)
+                                ? "bg-green-500 text-white"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {["payment-pending", "payment-distributed"].includes(jobData.flowStatus) ? (
+                              <CheckCircle className="h-5 w-5" />
+                            ) : (
+                              <CheckCircle className="h-5 w-5" />
+                            )}
+                          </div>
+                        </div>
+                        <span className={`text-xs mt-2 font-medium ${jobData.flowStatus === "work-finished" ? "text-primary" : "text-muted-foreground"}`}>
+                          Work Finished
                         </span>
                       </div>
 
@@ -668,7 +1251,7 @@ export default function AdminJobDetail() {
                         </div>
                         <div>
                           <h4 className="font-medium">Filling</h4>
-                          <p className="text-sm text-muted-foreground">Candidates are being selected</p>
+                          <p className="text-sm text-muted-foreground">Candidates are being selected ({jobData.positionsFilled}/{jobData.positionsNeeded} positions filled)</p>
                         </div>
                       </div>
                       <div className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
@@ -683,6 +1266,17 @@ export default function AdminJobDetail() {
                         </div>
                       </div>
                       <div className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
+                        jobData.flowStatus === "work-finished" ? "bg-primary/10" : ""
+                      }`}>
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <CheckCircle className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Work Finished</h4>
+                          <p className="text-sm text-muted-foreground">All work has been completed by the hired candidates</p>
+                        </div>
+                      </div>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
                         jobData.flowStatus === "payment-pending" || jobData.flowStatus === "payment-distributed" ? "bg-primary/10" : ""
                       }`}>
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -691,7 +1285,7 @@ export default function AdminJobDetail() {
                         <div>
                           <h4 className="font-medium">Payment</h4>
                           <p className="text-sm text-muted-foreground">Payment from owner and distribution</p>
-                    </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -713,6 +1307,62 @@ export default function AdminJobDetail() {
                       <CardDescription>People who have applied for this job</CardDescription>
                     </CardHeader>
                     <CardContent>
+                      <div className="flex justify-end mb-4">
+                        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button>
+                              <User className="mr-2 h-4 w-4" />
+                              Add Manual Applicant
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Add Manual Applicant</DialogTitle>
+                              <DialogDescription>
+                                Add an applicant manually to this job posting.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <Form {...form}>
+                              <form onSubmit={form.handleSubmit(handleAddManualApplicant)} className="space-y-4">
+                                <FormField
+                                  control={form.control}
+                                  name="name"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Name</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="Enter applicant name" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="phone"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Phone Number</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="Enter phone number" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <DialogFooter>
+                                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                                    Cancel
+                                  </Button>
+                                  <Button type="submit" disabled={isAddingApplicant}>
+                                    {isAddingApplicant ? "Adding..." : "Add Applicant"}
+                                  </Button>
+                                </DialogFooter>
+                              </form>
+                            </Form>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
                       <div className="rounded-md border">
                         <Table>
                           <TableHeader>
@@ -740,19 +1390,45 @@ export default function AdminJobDetail() {
                                 </TableCell>
                                 <TableCell>{applicant.appliedDate}</TableCell>
                                 <TableCell>
-                                  <Badge
-                                    variant={
-                                      applicant.status === "Hired"
-                                        ? "default"
-                                        : applicant.status === "Rejected"
-                                          ? "destructive"
-                                          : applicant.status === "Interviewed"
-                                            ? "outline"
-                                            : "secondary"
-                                    }
-                                  >
-                                    {applicant.status}
-                                  </Badge>
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant={
+                                        applicant.status === "Hired"
+                                          ? "default"
+                                          : applicant.status === "Rejected"
+                                            ? "destructive"
+                                            : applicant.status === "Interviewed"
+                                              ? "outline"
+                                              : "secondary"
+                                      }
+                                    >
+                                      {applicant.status}
+                                    </Badge>
+                                    {jobData.flowStatus === "payment-distributed" && applicant.status === "Hired" && (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger>
+                                            <CheckCircle className="h-4 w-4 text-green-500" />
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>Payment distributed</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )}
+                                    {jobData.flowStatus === "payment-pending" && applicant.status === "Hired" && (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger>
+                                            <Clock className="h-4 w-4 text-yellow-500" />
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>Payment pending</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )}
+                                  </div>
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <DropdownMenu>
@@ -773,10 +1449,29 @@ export default function AdminJobDetail() {
                                         View Application
                                       </DropdownMenuItem>
                                       <DropdownMenuSeparator />
-                                      <DropdownMenuItem>
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        Mark as Hired
-                                      </DropdownMenuItem>
+                                      {jobData.flowStatus === "payment-pending" && (
+                                        <DropdownMenuItem onClick={() => handleCheckPaymentDistribution(applicant)}>
+                                          <Wallet className="mr-2 h-4 w-4" />
+                                          Check Payment Distribution
+                                        </DropdownMenuItem>
+                                      )}
+                                      {applicant.status === "Hired" ? (
+                                        <DropdownMenuItem 
+                                          onClick={() => handleRemoveHire(applicant.id)}
+                                          disabled={isRemovingHire}
+                                        >
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Remove Hire Status
+                                        </DropdownMenuItem>
+                                      ) : (
+                                        <DropdownMenuItem 
+                                          onClick={() => handleHireApplicant(applicant.id)}
+                                          disabled={isHiring}
+                                        >
+                                          <CheckCircle className="mr-2 h-4 w-4" />
+                                          Mark as Hired
+                                        </DropdownMenuItem>
+                                      )}
                                       <DropdownMenuItem className="text-destructive">
                                         <Trash2 className="mr-2 h-4 w-4" />
                                         Reject
@@ -835,6 +1530,103 @@ export default function AdminJobDetail() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-4">
+                    {jobData.flowStatus === "draft" && (
+                      <Button 
+                        onClick={handleApproveDraft}
+                        disabled={isApproving}
+                        className="flex items-center gap-2"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        {isApproving ? "Approving..." : "Approve Draft"}
+                      </Button>
+                    )}
+                    {jobData.flowStatus === "pending-approval" && (
+                      <>
+                        <Button 
+                          onClick={handlePostJob}
+                          disabled={isPosting}
+                          className="flex items-center gap-2"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          {isPosting ? "Posting..." : "Post Job"}
+                        </Button>
+                        <Button 
+                          onClick={handleUndoStatus}
+                          disabled={isUndoing}
+                          variant="outline"
+                          className="flex items-center gap-2"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                          {isUndoing ? "Reverting..." : "Revert to Draft"}
+                        </Button>
+                      </>
+                    )}
+                    {jobData.flowStatus === "active" && (
+                      <Button 
+                        onClick={handleUndoStatus}
+                        disabled={isUndoing}
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        {isUndoing ? "Reverting..." : "Revert to Pending Approval"}
+                      </Button>
+                    )}
+                    {jobData.flowStatus === "filling" && (
+                      <Button 
+                        onClick={handleUndoStatus}
+                        disabled={isUndoing}
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        {isUndoing ? "Reverting..." : "Revert to Active"}
+                      </Button>
+                    )}
+                    {jobData.flowStatus === "completed" && (
+                      <Button 
+                        onClick={handleUndoStatus}
+                        disabled={isUndoing}
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        {isUndoing ? "Reverting..." : "Revert to Filling"}
+                      </Button>
+                    )}
+                    {jobData.flowStatus === "work-finished" && (
+                      <Button 
+                        onClick={handleUndoStatus}
+                        disabled={isUndoing}
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        {isUndoing ? "Reverting..." : "Revert to Completed"}
+                      </Button>
+                    )}
+                    {jobData.flowStatus === "payment-pending" && (
+                      <Button 
+                        onClick={handleUndoStatus}
+                        disabled={isUndoing}
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        {isUndoing ? "Reverting..." : "Revert to Work Finished"}
+                      </Button>
+                    )}
+                    {jobData.flowStatus === "payment-distributed" && (
+                      <Button 
+                        onClick={handleUndoStatus}
+                        disabled={isUndoing}
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        {isUndoing ? "Reverting..." : "Revert to Payment Pending"}
+                      </Button>
+                    )}
                     <Button variant="outline" className="flex items-center gap-2">
                       <Edit className="h-4 w-4" />
                       Edit Job
@@ -848,10 +1640,34 @@ export default function AdminJobDetail() {
                       <Shield className="h-4 w-4" />
                       {jobData.status === "Active" ? "Deactivate Job" : "Activate Job"}
                     </Button>
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4" />
-                      Mark as Filled
-                    </Button>
+                    {jobData.flowStatus !== "completed" && jobData.positionsFilled < jobData.positionsNeeded && (
+                      <Button variant="outline" className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        Mark as Filled
+                      </Button>
+                    )}
+                    {jobData.flowStatus === "completed" && (
+                      <Button 
+                        variant="outline" 
+                        className="flex items-center gap-2"
+                        onClick={handleMarkWorkFinished}
+                        disabled={isMarkingWorkFinished}
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        {isMarkingWorkFinished ? "Marking..." : "Mark as Work Finished"}
+                      </Button>
+                    )}
+                    {jobData.flowStatus === "work-finished" && (
+                      <Button 
+                        variant="outline" 
+                        className="flex items-center gap-2"
+                        onClick={handleMarkPaymentReceived}
+                        disabled={isMarkingPaymentReceived}
+                      >
+                        <DollarSign className="h-4 w-4" />
+                        {isMarkingPaymentReceived ? "Marking..." : "Mark Payment Received"}
+                      </Button>
+                    )}
                     <Button variant="destructive" className="flex items-center gap-2">
                       <Trash2 className="h-4 w-4" />
                       Delete Job
@@ -861,6 +1677,52 @@ export default function AdminJobDetail() {
               </Card>
             </div>
           </div>
+
+          {/* Payment Distribution Dialog */}
+          <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Payment Distribution</DialogTitle>
+                <DialogDescription>
+                  Review and confirm payment distribution for {selectedApplicant?.name}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={selectedApplicant?.avatar} alt={selectedApplicant?.name} />
+                    <AvatarFallback>{selectedApplicant?.name?.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="font-medium">{selectedApplicant?.name}</div>
+                    <div className="text-sm text-muted-foreground">{selectedApplicant?.email}</div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Job Rate:</span>
+                    <span className="font-medium">{jobData.rate}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Payment Status:</span>
+                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+                      {distributedPayments.includes(selectedApplicant?.id || '') ? "Distributed" : "Pending Distribution"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)}>
+                  Cancel
+                </Button>
+                {!distributedPayments.includes(selectedApplicant?.id || '') && (
+                  <Button onClick={handleMarkPaymentDistributed} disabled={isCheckingPayment}>
+                    {isCheckingPayment ? "Processing..." : "Mark as Distributed"}
+                  </Button>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </div>
