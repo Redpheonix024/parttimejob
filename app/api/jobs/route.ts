@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getJobs } from '@/lib/firebase';
 
 export async function GET(request: NextRequest) {
-  // This would typically fetch jobs from a database
   try {
-    // Example response with dummy data
-    return NextResponse.json({ 
-      jobs: [
-        { id: 1, title: 'Frontend Developer', company: 'Example Corp' },
-        { id: 2, title: 'Backend Developer', company: 'Tech Solutions' }
-      ] 
-    });
+    const jobs = await getJobs();
+    return NextResponse.json({ jobs });
   } catch (error) {
     console.error("Error fetching jobs:", error);
     return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 });

@@ -19,11 +19,14 @@ export default function AuthProvider({
       // Public paths that don't require authentication
       const publicPaths = ["/", "/login", "/register"];
       
+      // Check if path is a job details page
+      const isJobDetailsPage = pathname.startsWith("/jobs/");
+      
       // Admin paths that should not redirect to /login but to /admin/login instead
       const isAdminPath = pathname.startsWith("/admin");
       
       // Check if current path is public
-      const isPublicPath = publicPaths.includes(pathname);
+      const isPublicPath = publicPaths.includes(pathname) || isJobDetailsPage;
 
       if (!user && !isPublicPath && !isAdminPath) {
         // For non-admin paths, redirect to regular login

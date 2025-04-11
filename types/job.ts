@@ -2,7 +2,17 @@ export interface Job {
   id: string
   title: string
   company: string
-  location: string
+  location: {
+    address?: string
+    city: string
+    state: string
+    zip?: string
+    coordinates?: {
+      lat: number
+      lng: number
+    }
+    display?: string
+  }
   hours: string
   rate: string
   duration: string
@@ -17,6 +27,9 @@ export interface Job {
   applicationMethod?: string
   contactPerson?: string
   applicationInstructions?: string
+  createdAt?: Date
+  updatedAt?: Date
+  userId?: string
 }
 
 export interface JobStatus extends Job {

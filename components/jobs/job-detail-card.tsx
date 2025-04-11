@@ -8,6 +8,32 @@ interface JobDetailCardProps {
 }
 
 export default function JobDetailCard({ job }: JobDetailCardProps) {
+  // Function to get the location display text
+  const getLocationDisplay = () => {
+    if (!job.location) return "Remote";
+    if (typeof job.location === "string") return job.location;
+    
+    // If location is an object
+    if (typeof job.location === "object") {
+      // Check for display property first
+      if (job.location.display) return job.location.display;
+      
+      // Check for city and state combination
+      if (job.location.city && job.location.state) {
+        return `${job.location.city}, ${job.location.state}`;
+      }
+      
+      // Check for address
+      if (job.location.address) return job.location.address;
+      
+      // Check for individual properties
+      if (job.location.city) return job.location.city;
+      if (job.location.state) return job.location.state;
+    }
+    
+    return "Location not specified";
+  };
+
   return (
     <div className="flex flex-wrap gap-4 mb-6">
       {job.urgent && (
@@ -21,7 +47,7 @@ export default function JobDetailCard({ job }: JobDetailCardProps) {
       </div>
       <div className="flex items-center text-sm">
         <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-        <span>{job.location}</span>
+        <span>{getLocationDisplay()}</span>
       </div>
       <div className="flex items-center text-sm">
         <Clock className="h-4 w-4 mr-2 text-muted-foreground" />

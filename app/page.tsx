@@ -1,8 +1,7 @@
 "use client";
 
 import type React from "react";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/main-layout";
 import SectionContainer from "@/components/layout/section-container";
 import PageHeader from "@/components/layout/page-header";
@@ -11,23 +10,178 @@ import JobList from "@/components/jobs/job-list";
 import JobFilters from "@/components/jobs/job-filters";
 import { Briefcase, Clock, Search } from "lucide-react";
 
+interface Job {
+  id: string;
+  title: string;
+  company: string;
+  location: {
+    address?: string;
+    city: string;
+    state: string;
+    zip?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+  };
+  hours: string;
+  rate: string;
+  duration: string;
+  postedDate: string;
+  urgent: boolean;
+  description?: string;
+  requirements?: string[];
+  skills?: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
+  userId?: string;
+  status: string;
+}
+
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [locationFilter, setLocationFilter] = useState("anywhere");
   const [sortBy, setSortBy] = useState("newest");
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const response = await fetch('/api/jobs');
+        if (!response.ok) {
+          throw new Error('Failed to fetch jobs');
+        }
+        const data = await response.json();
+        // Format the jobs data to match our interface
+        const formattedJobs = data.jobs.map((job: any) => {
+          // Debug the createdAt field
+          console.log('Job createdAt:', job.createdAt);
+          console.log('Job createdAt type:', typeof job.createdAt);
+          console.log('Job createdAt value:', job.createdAt);
+          
+          // Helper function to safely convert timestamp to relative time
+          const getPostedDate = (timestamp: any) => {
+            try {
+              if (!timestamp) return 'Recently';
+              
+              let date: Date;
+              
+              // Handle Firebase Timestamp
+              if (timestamp.seconds) {
+                date = new Date(timestamp.seconds * 1000);
+              }
+              // Handle ISO string
+              else if (typeof timestamp === 'string') {
+                date = new Date(timestamp);
+              }
+              // Handle Date object
+              else if (timestamp instanceof Date) {
+                date = timestamp;
+              } else {
+                return 'Recently';
+              }
+
+              if (isNaN(date.getTime())) {
+                return 'Recently';
+              }
+
+              const now = new Date();
+              const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+              
+              if (diffInSeconds < 60) {
+                return 'Just now';
+              }
+              
+              const diffInMinutes = Math.floor(diffInSeconds / 60);
+              if (diffInMinutes < 60) {
+                return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`;
+              }
+              
+              const diffInHours = Math.floor(diffInMinutes / 60);
+              if (diffInHours < 24) {
+                return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`;
+              }
+              
+              const diffInDays = Math.floor(diffInHours / 24);
+              if (diffInDays < 7) {
+                return `${diffInDays} ${diffInDays === 1 ? 'day' : 'days'} ago`;
+              }
+              
+              const diffInWeeks = Math.floor(diffInDays / 7);
+              if (diffInWeeks < 4) {
+                return `${diffInWeeks} ${diffInWeeks === 1 ? 'week' : 'weeks'} ago`;
+              }
+              
+              const diffInMonths = Math.floor(diffInDays / 30);
+              if (diffInMonths < 12) {
+                return `${diffInMonths} ${diffInMonths === 1 ? 'month' : 'months'} ago`;
+              }
+              
+              const diffInYears = Math.floor(diffInMonths / 12);
+              return `${diffInYears} ${diffInYears === 1 ? 'year' : 'years'} ago`;
+              
+            } catch (error) {
+              console.error('Error formatting date:', error);
+              return 'Recently';
+            }
+          };
+
+          return {
+            ...job,
+            postedDate: getPostedDate(job.createdAt),
+            urgent: job.urgent || false,
+            // Handle location data safely
+            location: {
+              ...(job.location || {}),
+              display: job.location?.display || 
+                      (job.location?.city && job.location?.state 
+                        ? `${job.location.city}, ${job.location.state}`
+                        : job.workLocation === 'on-site' ? 'On-site' : 'Remote'),
+              city: job.location?.city || '',
+              state: job.location?.state || '',
+              address: job.location?.address || '',
+              zip: job.location?.zip || '',
+              coordinates: job.location?.coordinates || null
+            }
+          };
+        });
+        setJobs(formattedJobs);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, []);
 
   // Filter jobs based on search query and filters
-  const filteredJobs = jobListings.filter((job) => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        job.title.toLowerCase().includes(query) ||
-        job.company.toLowerCase().includes(query) ||
-        job.location.toLowerCase().includes(query)
-      );
-    }
-    return true;
-  });
+  const filteredJobs = jobs
+    .filter((job) => job.status === "Active") // First filter for active jobs
+    .filter((job) => {
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return (
+          job.title.toLowerCase().includes(query) ||
+          job.company.toLowerCase().includes(query) ||
+          job.location.city.toLowerCase().includes(query) ||
+          job.location.state.toLowerCase().includes(query) ||
+          job.description?.toLowerCase().includes(query)
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'newest') {
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      } else if (sortBy === 'oldest') {
+        return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+      }
+      return 0;
+    });
 
   return (
     <MainLayout activeLink="jobs">
@@ -52,13 +206,20 @@ export default function Home() {
           onSortChange={setSortBy}
         />
 
-        <JobList jobs={filteredJobs} />
-
-        <div className="mt-10 text-center">
-          <button className="px-4 py-2 border rounded-md hover:bg-muted transition-colors">
-            Load More Jobs
-          </button>
-        </div>
+        {loading ? (
+          <div className="text-center py-8">Loading jobs...</div>
+        ) : error ? (
+          <div className="text-center py-8 text-red-500">{error}</div>
+        ) : (
+          <>
+            <JobList jobs={filteredJobs} />
+            <div className="mt-10 text-center">
+              <button className="px-4 py-2 border rounded-md hover:bg-muted transition-colors">
+                Load More Jobs
+              </button>
+            </div>
+          </>
+        )}
       </SectionContainer>
 
       <SectionContainer muted>
@@ -108,71 +269,4 @@ function FeatureCard({
 }
 
 // Sample job data
-const jobListings = [
-  {
-    id: "1",
-    title: "Weekend Barista",
-    company: "Coffee House",
-    location: "San Francisco, CA",
-    hours: "10-15 hours/week",
-    rate: "₹1350-1650/hour",
-    duration: "3 months",
-    postedDate: "2 days ago",
-    urgent: true,
-  },
-  {
-    id: "2",
-    title: "Event Photographer",
-    company: "EventPro Agency",
-    location: "Remote",
-    hours: "Flexible hours",
-    rate: "₹25-35/hour",
-    duration: "One-time event",
-    postedDate: "3 days ago",
-    urgent: false,
-  },
-  {
-    id: "3",
-    title: "Dog Walker",
-    company: "PetCare Services",
-    location: "Brooklyn, NY",
-    hours: "5-10 hours/week",
-    rate: "₹15-18/hour",
-    duration: "Ongoing",
-    postedDate: "1 week ago",
-    urgent: false,
-  },
-  {
-    id: "4",
-    title: "Social Media Assistant",
-    company: "Digital Marketing Co.",
-    location: "Remote",
-    hours: "15-20 hours/week",
-    rate: "₹20-25/hour",
-    duration: "6 months",
-    postedDate: "5 days ago",
-    urgent: false,
-  },
-  {
-    id: "5",
-    title: "Delivery Driver",
-    company: "Local Eats",
-    location: "Chicago, IL",
-    hours: "Evenings & Weekends",
-    rate: "₹1275-1500/hour + tips",
-    duration: "Ongoing",
-    postedDate: "3 days ago",
-    urgent: true,
-  },
-  {
-    id: "6",
-    title: "Tutor - Mathematics",
-    company: "Learning Center",
-    location: "Hybrid",
-    hours: "8-12 hours/week",
-    rate: "₹1875-2625/hour",
-    duration: "School year",
-    postedDate: "1 day ago",
-    urgent: false,
-  },
-];
+
