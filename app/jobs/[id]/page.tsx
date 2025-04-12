@@ -1,25 +1,85 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Share2, ArrowLeft } from "lucide-react";
-import { doc, getDoc } from "firebase/firestore";
+import { Share2, ArrowLeft, Mic, Play, Download, CheckCircle } from "lucide-react";
+import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/app/config/firebase";
+import { auth } from "@/app/config/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { toast } from "sonner";
 import MainLayout from "@/components/layout/main-layout";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Public page - no authentication required
 export default function JobDetails() {
   const params = useParams();
+  const router = useRouter();
   const jobId = params.id as string;
   
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [applicationForm, setApplicationForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    coverLetter: "",
+    termsAccepted: false
+  });
+
+  // Check authentication status
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      
+      if (user) {
+        try {
+          // Fetch user profile from Firestore
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUserProfile(userData);
+            
+            // Pre-fill the form with user data
+            setApplicationForm(prev => ({
+              ...prev,
+              name: userData.firstName && userData.lastName 
+                ? `${userData.firstName} ${userData.lastName}` 
+                : userData.displayName || user.displayName || "",
+              email: userData.email || user.email || "",
+              phone: userData.phone || user.phoneNumber || ""
+            }));
+          }
+        } catch (err) {
+          console.error("Error fetching user data:", err);
+        }
+      }
+    });
+    
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     // Public data fetching - no auth required
@@ -40,10 +100,17 @@ export default function JobDetails() {
           id: jobDoc.id,
           title: jobData.title || 'Untitled Job',
           company: jobData.company || 'Unknown Company',
+          companyLogo: jobData.companyLogo || "/placeholder.svg?height=40&width=40",
           description: jobData.description || '',
-          location: jobData.location || { display: 'Remote' },
+          location: typeof jobData.location === 'object' 
+            ? jobData.location.display || jobData.location.address || 'Remote'
+            : jobData.location || 'Remote',
+          type: jobData.type || 'Not specified',
+          category: jobData.category || 'Not specified',
           hours: jobData.hours || 'Not specified',
-          rate: jobData.rate || 'Not specified',
+          rate: jobData.salaryAmount 
+            ? `₹${jobData.salaryAmount}/${jobData.salaryType}`
+            : (jobData.rate || 'Not specified'),
           duration: jobData.duration || 'Not specified',
           postedDate: jobData.createdAt 
             ? new Date(jobData.createdAt.seconds * 1000).toLocaleDateString('en-US', {
@@ -52,10 +119,32 @@ export default function JobDetails() {
                 day: 'numeric'
               })
             : 'Recently',
+          expiryDate: jobData.expiryDate 
+            ? new Date(jobData.expiryDate.seconds * 1000).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })
+            : undefined,
           urgent: jobData.urgent || false,
+          featured: jobData.featured || false,
           responsibilities: jobData.responsibilities || [],
           requirements: jobData.requirements || [],
-          benefits: jobData.benefits || []
+          benefits: jobData.benefits || [],
+          applicationInstructions: jobData.applicationInstructions || '',
+          skills: jobData.skills || [],
+          positionsNeeded: jobData.positionsNeeded || 1,
+          positionsFilled: jobData.positionsFilled || 0,
+          gender: jobData.gender || undefined,
+          minAge: jobData.minAge || undefined,
+          maxAge: jobData.maxAge || undefined,
+          payType: jobData.payType || undefined,
+          companyDescription: jobData.companyDescription || '',
+          contactPerson: jobData.contactPerson || '',
+          applicationMethod: jobData.applicationMethod || '',
+          workLocation: jobData.workLocation || 'Remote',
+          status: jobData.status || 'Active',
+          audioDescription: jobData.audioDescription || null
         };
         
         setJob(formattedJob);
@@ -95,6 +184,85 @@ export default function JobDetails() {
     }
     
     return "Location not specified";
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setApplicationForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleCheckboxChange = (checked: boolean) => {
+    setApplicationForm(prev => ({
+      ...prev,
+      termsAccepted: checked
+    }));
+  };
+
+  const handleApply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!applicationForm.name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+    
+    if (!applicationForm.phone.trim()) {
+      toast.error("Please enter your phone number");
+      return;
+    }
+    
+    if (!applicationForm.termsAccepted) {
+      toast.error("Please accept the terms");
+      return;
+    }
+    
+    try {
+      setIsApplying(true);
+      
+      // Create application in Firestore
+      const applicationData: any = {
+        jobId,
+        name: applicationForm.name,
+        email: applicationForm.email,
+        phone: applicationForm.phone,
+        coverLetter: applicationForm.coverLetter,
+        jobTitle: job.title,
+        company: job.company,
+        status: "Applied",
+        isManual: !currentUser, // Set to true for guest applications
+        createdAt: serverTimestamp()
+      };
+      
+      // Add user ID if authenticated
+      if (currentUser) {
+        applicationData.userId = currentUser.uid;
+        applicationData.isManual = false;
+      }
+      
+      await addDoc(collection(db, "applications"), applicationData);
+      
+      // Show success message
+      setIsSubmitted(true);
+      toast.success("Application submitted successfully!");
+      
+      // Reset form after successful submission
+      setApplicationForm({
+        name: "",
+        email: "",
+        phone: "",
+        coverLetter: "",
+        termsAccepted: false
+      });
+      
+    } catch (err) {
+      console.error("Error submitting application:", err);
+      toast.error("Failed to submit application. Please try again.");
+    } finally {
+      setIsApplying(false);
+    }
   };
 
   if (loading) {
@@ -154,6 +322,16 @@ export default function JobDetails() {
                   Urgent
                 </div>
               )}
+              {job.featured && (
+                <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                  Featured
+                </div>
+              )}
+              {job.status !== "Active" && (
+                <div className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
+                  {job.status}
+                </div>
+              )}
               <div className="flex items-center text-sm">
                 <span className="font-medium mr-2">Company:</span>
                 <span>{job.company}</span>
@@ -178,6 +356,12 @@ export default function JobDetails() {
                 <span className="font-medium mr-2">Posted:</span>
                 <span>{job.postedDate}</span>
               </div>
+              {job.expiryDate && (
+                <div className="flex items-center text-sm">
+                  <span className="font-medium mr-2">Expires:</span>
+                  <span>{job.expiryDate}</span>
+                </div>
+              )}
             </div>
 
             <Card className="mb-8">
@@ -185,7 +369,73 @@ export default function JobDetails() {
                 <CardTitle>Job Description</CardTitle>
               </CardHeader>
               <CardContent className="prose max-w-none">
+                {/* Key job information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Company:</span>
+                    <span>{job.company}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Location:</span>
+                    <span>{getLocationDisplay()}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Hours:</span>
+                    <span>{job.hours}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Pay Rate:</span>
+                    <span>{job.rate}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Duration:</span>
+                    <span>{job.duration}</span>
+                  </div>
+                </div>
+
                 {job.description && <p>{job.description}</p>}
+                
+                {/* Voice Description Section */}
+                {job.audioDescription && (
+                  <div className="my-6 space-y-2">
+                    <h3>Voice Description</h3>
+                    <div className="bg-muted/30 p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Mic className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">Audio Description</span>
+                        </div>
+                        {job.audioDescription.url && (
+                          <a
+                            href={job.audioDescription.url}
+                            download
+                            className="text-muted-foreground hover:text-primary"
+                          >
+                            <Download className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <audio 
+                          controls 
+                          className="w-full h-10 [&::-webkit-media-controls-panel]:bg-muted/50"
+                          onError={(e) => {
+                            console.error("Audio error:", e);
+                            toast.error("Failed to load audio description");
+                          }}
+                        >
+                          <source src={job.audioDescription.url} type="audio/webm" />
+                          Your browser does not support the audio element.
+                        </audio>
+                      </div>
+                      {job.audioDescription.duration && (
+                        <div className="text-xs text-muted-foreground mt-2">
+                          Duration: {job.audioDescription.duration} seconds
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 
                 {/* Job Details */}
                 <div className="my-4 space-y-2">
@@ -196,10 +446,10 @@ export default function JobDetails() {
                     {job.hours && <li><strong>Working Hours:</strong> {job.hours}</li>}
                     {job.duration && <li><strong>Duration:</strong> {job.duration}</li>}
                     {job.rate && <li><strong>Pay Rate:</strong> {job.rate}</li>}
-                    {job.salaryAmount && <li><strong>Salary:</strong> ₹{job.salaryAmount} {job.salaryType === 'daily' ? 'per day' : 'per month'}</li>}
-                    {job.startDate && <li><strong>Start Date:</strong> {new Date(job.startDate).toLocaleDateString()}</li>}
-                    {job.positions && <li><strong>Positions:</strong> {job.positions}</li>}
-                    {job.positionsFilled !== undefined && job.positions && <li><strong>Positions Filled:</strong> {job.positionsFilled} of {job.positions}</li>}
+                    {job.payType && <li><strong>Payment Type:</strong> {job.payType}</li>}
+                    {job.positionsNeeded && <li><strong>Positions:</strong> {job.positionsNeeded}</li>}
+                    {job.positionsFilled !== undefined && job.positionsNeeded && 
+                      <li><strong>Positions Filled:</strong> {job.positionsFilled} of {job.positionsNeeded}</li>}
                     {job.minAge && <li><strong>Minimum Age:</strong> {job.minAge} years</li>}
                     {job.maxAge && <li><strong>Maximum Age:</strong> {job.maxAge} years</li>}
                     {job.gender && <li><strong>Preferred Gender:</strong> {job.gender}</li>}
@@ -237,6 +487,27 @@ export default function JobDetails() {
                     </ul>
                   </>
                 )}
+                {job.skills && job.skills.length > 0 && (
+                  <>
+                    <h3>Skills Required:</h3>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {typeof job.skills === 'string' 
+                        ? job.skills.split(',').map((skill: string, index: number) => (
+                            <span key={index} className="bg-secondary px-2 py-1 rounded-full text-xs">
+                              {skill.trim()}
+                            </span>
+                          ))
+                        : Array.isArray(job.skills) 
+                          ? job.skills.map((skill: string, index: number) => (
+                              <span key={index} className="bg-secondary px-2 py-1 rounded-full text-xs">
+                                {skill.trim()}
+                              </span>
+                            ))
+                          : null
+                      }
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -268,7 +539,7 @@ export default function JobDetails() {
                 )}
                 {job.contactPerson && (
                   <p className="text-sm">
-                    <span className="font-medium">Contact:</span> {job.contactPerson}
+                    <span className="font-medium">Contact Person:</span> {job.contactPerson}
                   </p>
                 )}
                 {job.applicationInstructions && (
@@ -277,11 +548,150 @@ export default function JobDetails() {
                     <p className="text-sm text-muted-foreground">{job.applicationInstructions}</p>
                   </>
                 )}
+                
+                {/* Position details */}
+                <div className="bg-muted/50 p-3 rounded-lg">
+                  <p className="text-sm font-medium mb-2">Position Details</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {job.positionsNeeded && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">Positions</p>
+                        <p>{job.positionsNeeded}</p>
+                      </div>
+                    )}
+                    {job.positionsFilled !== undefined && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">Filled</p>
+                        <p>{job.positionsFilled} of {job.positionsNeeded}</p>
+                      </div>
+                    )}
+                    {job.status && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">Status</p>
+                        <p>{job.status}</p>
+                      </div>
+                    )}
+                    {job.expiryDate && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">Expires</p>
+                        <p>{job.expiryDate}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" asChild>
-                  <Link href={`/jobs/${jobId}/apply`}>Apply Now</Link>
-                </Button>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button className="w-full">Apply Now</Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    {isSubmitted ? (
+                      <div className="py-6 text-center">
+                        <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                          <CheckCircle className="h-6 w-6 text-primary" />
+                        </div>
+                        <DialogTitle className="text-xl mb-2">Application Submitted!</DialogTitle>
+                        <DialogDescription>
+                          Your application for {job.title} at {job.company} has been sent successfully.
+                          <br /><br />
+                          The employer will contact you if they are interested in your application.
+                        </DialogDescription>
+                        <div className="mt-6 flex flex-col space-y-2">
+                          <Button 
+                            onClick={() => {
+                              setIsSubmitted(false);
+                              router.push("/");
+                            }}
+                          >
+                            Browse More Jobs
+                          </Button>
+                          <DialogClose asChild>
+                            <Button variant="outline">Close</Button>
+                          </DialogClose>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <DialogHeader>
+                          <DialogTitle>Apply for {job.title}</DialogTitle>
+                          <DialogDescription>
+                            Fill out the form below to apply for this position at {job.company}.
+                            {!currentUser && (
+                              <div className="mt-2">
+                                <Link href={`/login?redirect=/jobs/${jobId}`} className="text-primary hover:underline">
+                                  Sign in
+                                </Link> to automatically fill your details.
+                              </div>
+                            )}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleApply}>
+                          <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                              <Label htmlFor="name">Full Name</Label>
+                              <Input
+                                id="name"
+                                name="name"
+                                value={applicationForm.name}
+                                onChange={handleChange}
+                                required
+                              />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="email">Email {currentUser ? "" : "(Optional)"}</Label>
+                              <Input
+                                id="email"
+                                name="email"
+                                type="email"
+                                value={applicationForm.email}
+                                onChange={handleChange}
+                                required={!!currentUser}
+                              />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="phone">Phone Number</Label>
+                              <Input
+                                id="phone"
+                                name="phone"
+                                type="tel"
+                                value={applicationForm.phone}
+                                onChange={handleChange}
+                                required
+                              />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="coverLetter">Why are you interested in this job? (Optional)</Label>
+                              <Textarea
+                                id="coverLetter"
+                                name="coverLetter"
+                                value={applicationForm.coverLetter}
+                                onChange={handleChange}
+                                className="min-h-[100px]"
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                id="terms" 
+                                checked={applicationForm.termsAccepted}
+                                onCheckedChange={handleCheckboxChange}
+                                required
+                              />
+                              <Label htmlFor="terms" className="text-sm">
+                                I agree to be contacted about this job opportunity
+                              </Label>
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button type="submit" disabled={isApplying}>
+                              {isApplying ? "Submitting..." : "Submit Application"}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </>
+                    )}
+                  </DialogContent>
+                </Dialog>
               </CardFooter>
             </Card>
           </div>
