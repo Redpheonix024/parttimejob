@@ -1,6 +1,18 @@
 import { NextResponse } from 'next/server';
-import { getJobs, getUser, deleteJob } from '@/lib/firebase';
+import { getJobs, getUser, deleteJob, db } from '@/lib/firebase';
 import { Timestamp } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+
+// Initialize Firebase
+const app = initializeApp({
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+});
 
 interface Job {
   id: string;
@@ -106,6 +118,78 @@ export async function DELETE(request: Request) {
     console.error('Error deleting job:', error);
     return NextResponse.json(
       { error: 'Failed to delete job' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const { id, ...jobData } = await request.json();
+    
+    if (!id) {
+      return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
+    }
+
+    const jobRef = doc(db, "jobs", id);
+    await updateDoc(jobRef, {
+      ...jobData,
+      updatedAt: new Date()
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error updating job:', error);
+    return NextResponse.json(
+      { error: 'Failed to update job' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const { id, action } = await request.json();
+    
+    if (!id) {
+      return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
+    }
+
+    if (!action || !['activate', 'deactivate'].includes(action)) {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    }
+
+    const jobRef = doc(db, "jobs", id);
+    const jobDoc = await getDoc(jobRef);
+    
+    if (!jobDoc.exists()) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    const currentStatus = jobDoc.data().status?.toLowerCase() || 'active';
+    const newStatus = action === 'activate' ? 'Active' : 'Deactivated';
+
+    // Only update if the status is actually changing
+    if (currentStatus === newStatus.toLowerCase()) {
+      return NextResponse.json({ 
+        success: true,
+        message: `Job is already ${newStatus.toLowerCase()}`
+      });
+    }
+
+    await updateDoc(jobRef, {
+      status: newStatus,
+      updatedAt: new Date()
+    });
+
+    return NextResponse.json({ 
+      success: true,
+      message: `Job ${action === 'activate' ? 'activated' : 'deactivated'} successfully`
+    });
+  } catch (error) {
+    console.error('Error updating job status:', error);
+    return NextResponse.json(
+      { error: 'Failed to update job status' },
       { status: 500 }
     );
   }

@@ -14,12 +14,7 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children, activeLink, title }: AdminLayoutProps) {
   const router = useRouter()
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
-
-  const handleLogout = () => {
-    // In a real app, this would clear authentication state
-    router.push("/admin/login")
-  }
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -27,7 +22,6 @@ export default function AdminLayout({ children, activeLink, title }: AdminLayout
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
         activeLink={activeLink}
-        onLogout={handleLogout}
       />
 
       {/* Main content */}

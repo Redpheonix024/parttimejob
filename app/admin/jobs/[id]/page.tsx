@@ -73,6 +73,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { EditJobForm } from "@/app/components/admin/edit-job-form"
 
 // Add these interfaces at the top of the file after imports
 interface JobData {
@@ -182,6 +183,10 @@ export default function AdminJobDetail() {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
   const [distributedPayments, setDistributedPayments] = useState<string[]>([])
   const [isUndoing, setIsUndoing] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDeactivating, setIsDeactivating] = useState(false)
 
   const form = useForm<ManualApplicantFormValues>({
     resolver: zodResolver(manualApplicantSchema),
@@ -658,6 +663,72 @@ export default function AdminJobDetail() {
     }
   }
 
+  const handleDeleteJob = async () => {
+    if (!jobData) return
+
+    try {
+      setIsDeleting(true)
+      const response = await fetch('/api/admin/jobs', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: jobData.id }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete job')
+      }
+
+      toast.success('Job deleted successfully')
+      router.push('/admin/jobs')
+    } catch (error) {
+      console.error('Error deleting job:', error)
+      toast.error('Failed to delete job')
+    } finally {
+      setIsDeleting(false)
+      setIsDeleteDialogOpen(false)
+    }
+  }
+
+  const handleDeactivateJob = async () => {
+    if (!jobData) return
+
+    try {
+      setIsDeactivating(true)
+      const response = await fetch('/api/admin/jobs', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          id: jobData.id,
+          action: jobData.status.toLowerCase() === 'active' ? 'deactivate' : 'activate'
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to update job status')
+      }
+
+      const result = await response.json()
+
+      // Update local state
+      setJobData(prev => prev ? {
+        ...prev,
+        status: prev.status.toLowerCase() === 'active' ? 'Deactivated' : 'Active'
+      } : null)
+
+      toast.success(result.message || `Job ${jobData.status.toLowerCase() === 'active' ? 'deactivated' : 'activated'} successfully`)
+    } catch (error) {
+      console.error('Error updating job status:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to update job status')
+    } finally {
+      setIsDeactivating(false)
+    }
+  }
+
   // Function to get status color
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -762,6 +833,9 @@ export default function AdminJobDetail() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant={jobData.status === "Active" ? "default" : "outline"}>{jobData.status}</Badge>
+                  {jobData.status === "Deactivated" && (
+                    <Badge variant="destructive">Deactivated</Badge>
+                  )}
                   {jobData.featured && <Badge variant="secondary">Featured</Badge>}
                   {jobData.urgent && <Badge variant="destructive">Urgent</Badge>}
                 </div>
@@ -977,7 +1051,11 @@ export default function AdminJobDetail() {
                   <Eye className="h-4 w-4" />
                   View Public Listing
                 </Button>
-                <Button variant="outline" className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  onClick={() => setIsEditDialogOpen(true)}
+                >
                   <Edit className="h-4 w-4" />
                   Edit Job
                 </Button>
@@ -1627,7 +1705,11 @@ export default function AdminJobDetail() {
                         {isUndoing ? "Reverting..." : "Revert to Payment Pending"}
                       </Button>
                     )}
-                    <Button variant="outline" className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      className="flex items-center gap-2"
+                      onClick={() => setIsEditDialogOpen(true)}
+                    >
                       <Edit className="h-4 w-4" />
                       Edit Job
                     </Button>
@@ -1636,9 +1718,16 @@ export default function AdminJobDetail() {
                       className={`flex items-center gap-2 ${
                         jobData.status === "Active" ? "text-red-500 hover:text-red-500" : ""
                       }`}
+                      onClick={handleDeactivateJob}
+                      disabled={isDeactivating}
                     >
                       <Shield className="h-4 w-4" />
-                      {jobData.status === "Active" ? "Deactivate Job" : "Activate Job"}
+                      {isDeactivating 
+                        ? "Updating..." 
+                        : jobData.status === "Active" 
+                          ? "Deactivate Job" 
+                          : "Activate Job"
+                      }
                     </Button>
                     {jobData.flowStatus !== "completed" && jobData.positionsFilled < jobData.positionsNeeded && (
                       <Button variant="outline" className="flex items-center gap-2">
@@ -1668,7 +1757,11 @@ export default function AdminJobDetail() {
                         {isMarkingPaymentReceived ? "Marking..." : "Mark Payment Received"}
                       </Button>
                     )}
-                    <Button variant="destructive" className="flex items-center gap-2">
+                    <Button 
+                      variant="destructive" 
+                      className="flex items-center gap-2"
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                    >
                       <Trash2 className="h-4 w-4" />
                       Delete Job
                     </Button>
@@ -1721,6 +1814,57 @@ export default function AdminJobDetail() {
                   </Button>
                 )}
               </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Job Dialog */}
+          <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete Job</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to delete this job? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center">
+                    <Briefcase className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <div className="font-medium">{jobData?.title}</div>
+                    <div className="text-sm text-muted-foreground">{jobData?.company}</div>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={handleDeleteJob}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete Job"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Job Dialog */}
+          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Edit Job</DialogTitle>
+                <DialogDescription>
+                  Update the job details below. All fields marked with * are required.
+                </DialogDescription>
+              </DialogHeader>
+              <EditJobForm 
+                jobData={jobData} 
+                onClose={() => setIsEditDialogOpen(false)} 
+              />
             </DialogContent>
           </Dialog>
         </main>
