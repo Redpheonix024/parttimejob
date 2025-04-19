@@ -4,8 +4,125 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import DashboardLayout from "@/components/dashboard/dashboard-layout"
 import ApplicationCard from "@/components/dashboard/application-card"
+import { useEffect, useState } from "react"
+import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore"
+import { db } from "@/app/config/firebase"
+import { useAuth } from "@/hooks/useAuth"
+import { format } from "date-fns"
+
+interface Application {
+  id: string
+  jobTitle: string
+  company: string
+  location: string
+  salary: string
+  type: string
+  appliedDate: string
+  status: string
+  jobId: string
+}
+
+interface JobData {
+  location?: {
+    display?: string
+  }
+  salaryAmount?: string
+  salaryType?: string
+  jobType?: string
+}
+
+interface ApplicationData {
+  jobTitle: string
+  company: string
+  jobId: string
+  status: string
+  createdAt: {
+    toDate: () => Date
+  }
+}
 
 export default function Applications() {
+  const { user } = useAuth()
+  const [applications, setApplications] = useState<Application[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchApplications = async () => {
+    if (!user?.uid) return
+
+    try {
+      const applicationsQuery = query(
+        collection(db, "applications"),
+        where("userId", "==", user.uid)
+      )
+
+      const querySnapshot = await getDocs(applicationsQuery)
+      const fetchedApplications = await Promise.all(
+        querySnapshot.docs.map(async (docSnapshot) => {
+          const data = docSnapshot.data() as ApplicationData
+          
+          // Fetch job details if jobId exists
+          let jobDetails = {
+            location: "Remote",
+            salary: "Not specified",
+            type: "Not specified"
+          }
+          
+          if (data.jobId) {
+            try {
+              const jobDocRef = doc(db, "jobs", data.jobId)
+              const jobDoc = await getDoc(jobDocRef)
+              if (jobDoc.exists()) {
+                const jobData = jobDoc.data() as JobData
+                jobDetails = {
+                  location: jobData.location?.display || "Remote",
+                  salary: jobData.salaryAmount ? `${jobData.salaryAmount} ${jobData.salaryType}` : "Not specified",
+                  type: jobData.jobType || "Not specified"
+                }
+              }
+            } catch (error) {
+              console.error("Error fetching job details:", error)
+            }
+          }
+
+          return {
+            id: docSnapshot.id,
+            jobTitle: data.jobTitle,
+            company: data.company,
+            location: jobDetails.location,
+            salary: jobDetails.salary,
+            type: jobDetails.type,
+            appliedDate: data.createdAt 
+              ? format(data.createdAt.toDate(), "MMM d, yyyy")
+              : "N/A",
+            status: data.status || "applied",
+            jobId: data.jobId
+          }
+        })
+      )
+
+      // Sort applications by date in descending order
+      const sortedApplications = fetchedApplications.sort((a, b) => {
+        const dateA = new Date(a.appliedDate)
+        const dateB = new Date(b.appliedDate)
+        return dateB.getTime() - dateA.getTime()
+      })
+
+      setApplications(sortedApplications)
+    } catch (error) {
+      console.error("Error fetching applications:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchApplications()
+  }, [user?.uid])
+
+  const handleRemoveApplication = (applicationId: string) => {
+    setApplications(applications.filter(app => app.id !== applicationId))
+  }
+
   return (
     <DashboardLayout activeRoute="applications">
       <div className="flex items-center justify-between mb-6">
@@ -19,67 +136,26 @@ export default function Applications() {
           <CardDescription>Track the status of your job applications</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            {allApplications.map((application, index) => (
-              <div key={index} className="flex items-start justify-between border-b pb-6 last:border-0 last:pb-0">
-                <ApplicationCard application={application} />
-                <Button variant="link" size="sm" className="mt-2">
-                  View Details
-                </Button>
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-center py-4">Loading applications...</div>
+          ) : applications.length === 0 ? (
+            <div className="text-center py-4 text-muted-foreground">
+              You haven't applied to any jobs yet.
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {applications.map((application) => (
+                <ApplicationCard 
+                  key={application.id} 
+                  application={application}
+                  onRemove={() => handleRemoveApplication(application.id)}
+                />
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </DashboardLayout>
   )
 }
-
-const allApplications = [
-  {
-    jobTitle: "Frontend Developer",
-    company: "Tech Solutions Inc.",
-    location: "Remote",
-    salary: "₹2250-3000/hr",
-    type: "Part-time",
-    appliedDate: "2 days ago",
-    status: "Pending",
-  },
-  {
-    jobTitle: "UX Designer",
-    company: "Creative Agency",
-    location: "San Francisco, CA",
-    salary: "₹2625-3375/hr",
-    type: "Contract",
-    appliedDate: "1 week ago",
-    status: "Interview",
-  },
-  {
-    jobTitle: "Content Writer",
-    company: "Media Group",
-    location: "Chicago, IL",
-    salary: "₹1875-2250/hr",
-    type: "Part-time",
-    appliedDate: "3 days ago",
-    status: "Reviewed",
-  },
-  {
-    jobTitle: "Social Media Manager",
-    company: "Marketing Solutions",
-    location: "Remote",
-    salary: "₹1500-1875/hr",
-    type: "Part-time",
-    appliedDate: "2 weeks ago",
-    status: "Rejected",
-  },
-  {
-    jobTitle: "Customer Support",
-    company: "Service Pro",
-    location: "Austin, TX",
-    salary: "₹1350-1650/hr",
-    type: "Weekend",
-    appliedDate: "5 days ago",
-    status: "Pending",
-  },
-]
 

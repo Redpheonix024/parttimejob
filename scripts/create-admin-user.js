@@ -9,13 +9,15 @@ const {
 } = require('firebase/auth');
 const { getFirestore, doc, setDoc } = require('firebase/firestore');
 const dotenv = require('dotenv');
+const path = require('path');
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// Remove the duplicate dotenv config since we already configured it with the correct path
 
-dotenv.config();
 
 // Admin user credentials - should be environment variables in production
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@Parttimejob.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'securePassword123!';
-const ADMIN_NAME = process.env.ADMIN_NAME || 'System Administrator';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ;
+const ADMIN_NAME = process.env.ADMIN_NAME ;
 
 // Initialize Firebase
 const firebaseConfig = {
