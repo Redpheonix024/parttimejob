@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { Check, Circle, Trash2 } from "lucide-react"
+import { Check, Circle, Trash2, ArrowRight, ArrowDown } from "lucide-react"
 import { useState, useEffect } from "react"
 import { updateDoc, doc, deleteDoc } from "firebase/firestore"
 import { db } from "@/app/config/firebase"
@@ -29,6 +29,12 @@ interface Application {
   appliedDate: string
   status: string
   jobId: string
+  companyWebsite?: string
+  jobDescription?: string
+  jobUrl?: string
+  contactName?: string
+  contactEmail?: string
+  notes?: string
 }
 
 interface ApplicationDetailsProps {
@@ -88,90 +94,265 @@ export default function ApplicationDetails({ application, isOpen, onClose, onRem
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[800px] p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="px-0">
           <div className="flex justify-between items-center">
             <DialogTitle className="text-2xl">{application.jobTitle}</DialogTitle>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete your application.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleRemove} className="bg-red-500 hover:bg-red-600">
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+          </div>
+          <div className="mt-2">
+            <h3 className="text-lg font-medium">{application.company}</h3>
           </div>
         </DialogHeader>
 
-        <div className="space-y-6">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">{application.location}</Badge>
-            <Badge variant="outline">{application.type}</Badge>
-            <Badge variant="outline">{application.salary}</Badge>
-          </div>
+        <div className="flex flex-col sm:flex-row application-details-container">
+          <div className="w-full sm:w-2/3 sm:pr-6 space-y-6">
+            <div className="flex flex-wrap items-center gap-2">
+              {application.location && <Badge variant="outline">{application.location}</Badge>}
+              {application.type && <Badge variant="outline">{application.type}</Badge>}
+              {application.salary && <Badge variant="outline">{application.salary}</Badge>}
+            </div>
 
-          <div className="text-sm text-muted-foreground">
-            Applied on {application.appliedDate}
-          </div>
+            <div className="text-sm text-muted-foreground">
+              Applied on {application.appliedDate}
+            </div>
 
-          <div className="pt-4">
-            <h4 className="text-sm font-medium mb-4">Application Status</h4>
-            <div className="flex items-center justify-between w-full">
-              {sortedStages.map((stage, index) => {
-                const isCompleted = stage.order < currentStageOrder
-                const isCurrent = stage.id === currentStage
-                const isNextStage = stage.order === currentStageOrder + 1 && currentStage === "Applied"
-                const isHighlighted = isCurrent || isNextStage
-                const isLastHighlighted = isNextStage || (isCurrent && !isNextStage)
-                
-                return (
-                  <div key={stage.id} className="flex items-center flex-1">
-                    <div
-                      className={cn(
-                        "flex items-center justify-center w-8 h-8 rounded-full cursor-pointer relative",
-                        isCompleted ? "bg-green-500" : isHighlighted ? "bg-blue-500" : "bg-gray-200",
-                        isLastHighlighted && "animate-pulse"
-                      )}
-                      onClick={() => handleStageChange(stage.id)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4">
+              {/* Job Details Section */}
+              <div className="space-y-3 col-span-1 sm:col-span-2">
+                <h4 className="text-sm font-medium">Job Description</h4>
+                <div className="space-y-2 bg-slate-50 dark:bg-slate-900 p-3 rounded-md">
+                  {application.jobDescription ? (
+                    <div className="text-sm">{application.jobDescription}</div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground italic">No description available</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Company Information */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Company Information</h4>
+                <div className="space-y-2">
+                  <p className="text-sm">{application.company}</p>
+                  {application.companyWebsite && (
+                    <a 
+                      href={application.companyWebsite} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-500 hover:underline flex items-center gap-1"
                     >
-                      {isCompleted ? (
-                        <Check className="w-4 h-4 text-white" />
-                      ) : (
-                        <Circle className="w-4 h-4 text-white" />
-                      )}
-                    </div>
-                    <div className="ml-2 text-sm font-medium">{stage.name}</div>
-                    {index < sortedStages.length - 1 && stage.order < currentStageOrder + 1 && (
-                      <div
-                        className={cn(
-                          "h-0.5 flex-1 mx-2",
-                          stage.order < currentStageOrder ? "bg-green-500" : "bg-blue-500"
-                        )}
-                      />
+                      Visit Company Website
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Application Details */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Application Details</h4>
+                <div className="space-y-2">
+
+                  <div className="text-sm">
+                    <span className="font-medium">Salary:</span> {application.salary || 'Not specified'}
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium">Job Type:</span> {application.type || 'Not specified'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              {(application.contactName || application.contactEmail) && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium">Contact Information</h4>
+                  <div className="space-y-2">
+                    {application.contactName && (
+                      <div className="text-sm">
+                        <span className="font-medium">Name:</span> {application.contactName}
+                      </div>
+                    )}
+                    {application.contactEmail && (
+                      <div>
+                        <span className="text-sm font-medium">Email:</span>
+                        <a 
+                          href={`mailto:${application.contactEmail}`}
+                          className="text-sm ml-1 text-blue-500 hover:underline"
+                        >
+                          {application.contactEmail}
+                        </a>
+                      </div>
                     )}
                   </div>
-                )
-              })}
+                </div>
+              )}
+
+              {/* Application Notes */}
+              {application.notes && (
+                <div className="space-y-3 col-span-1 sm:col-span-2">
+                  <h4 className="text-sm font-medium">Notes</h4>
+                  <div className="text-sm bg-slate-50 dark:bg-slate-900 p-2 sm:p-3 rounded-md max-h-32 overflow-y-auto">
+                    {application.notes}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="pt-6 flex flex-wrap gap-4 justify-start">
+              {application.jobId && (
+                <a 
+                  href={`/jobs/${application.jobId}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 px-4 py-2 rounded-md flex items-center gap-2"
+                >
+                  View Public Listing
+                </a>
+              )}
+              
+              {application.jobUrl && (
+                <a 
+                  href={application.jobUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 px-4 py-2 rounded-md flex items-center gap-2"
+                >
+                  View Original Job Post
+                </a>
+              )}
             </div>
           </div>
 
-          <div className="pt-4">
-            <h4 className="text-sm font-medium mb-2">Company</h4>
-            <p className="text-sm">{application.company}</p>
+          <div className="w-full sm:w-1/3 border-t sm:border-t-0 sm:border-l pt-6 sm:pt-0 sm:pl-6 mt-6 sm:mt-0">
+            <h4 className="text-sm font-medium mb-4">Application Status</h4>
+            
+            {/* Mobile Status View (horizontal) */}
+            <div className="sm:hidden overflow-x-auto pb-4 -mx-4 px-4">
+              <div className="flex items-center" style={{ minWidth: "max-content" }}>
+                {sortedStages.map((stage, index) => {
+                  const isCompleted = stage.order < currentStageOrder
+                  const isCurrent = stage.id === currentStage
+                  const isHighlighted = isCurrent || isCompleted
+                  
+                  return (
+                    <div key={stage.id} className="flex flex-col items-center" style={{ width: "85px" }}>
+                      <div className="flex items-center w-full justify-center">
+                        <div
+                          className={cn(
+                            "w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300",
+                            isHighlighted ? "bg-blue-500 shadow-md" : "bg-gray-200",
+                            isCurrent && "ring-4 ring-blue-200"
+                          )}
+                          onClick={() => handleStageChange(stage.id)}
+                        >
+                          {isCompleted ? (
+                            <Check className="w-5 h-5 text-white" />
+                          ) : (
+                            <Circle className="w-5 h-5 text-white" />
+                          )}
+                        </div>
+                        
+                        {/* Connector with arrow */}
+                        {index < sortedStages.length - 1 && (
+                          <div className="flex items-center h-[2px] w-12 absolute" style={{ left: "55px" }}>
+                            <div className={cn(
+                              "h-[2px] flex-1", 
+                              isCompleted ? "bg-blue-500" : "bg-gray-200"
+                            )}></div>
+                            <ArrowRight 
+                              className={cn(
+                                "h-4 w-4 flex-shrink-0 -mr-2", 
+                                isCompleted ? "text-blue-500" : "text-gray-200"
+                              )} 
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-xs font-medium text-center w-full mt-2 truncate px-1">{stage.name}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            
+            {/* Desktop Status View (vertical) */}
+            <div className="hidden sm:block">
+              <div className="relative pl-5">
+                {sortedStages.map((stage, index) => {
+                  const isCompleted = stage.order < currentStageOrder
+                  const isCurrent = stage.id === currentStage
+                  const isHighlighted = isCurrent || isCompleted
+                  
+                  return (
+                    <div key={stage.id} className={cn("mb-12 last:mb-0 relative")}>
+                      <div className="flex items-center">
+                        <div
+                          className={cn(
+                            "w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300",
+                            isHighlighted ? "bg-blue-500 shadow-md" : "bg-gray-200",
+                            isCurrent && "ring-4 ring-blue-200"
+                          )}
+                          onClick={() => handleStageChange(stage.id)}
+                        >
+                          {isCompleted ? (
+                            <Check className="w-5 h-5 text-white" />
+                          ) : (
+                            <Circle className="w-5 h-5 text-white" />
+                          )}
+                        </div>
+                        <div className="text-sm font-medium ml-4">{stage.name}</div>
+                      </div>
+                      
+                      {/* Vertical connector with arrow */}
+                      {index < sortedStages.length - 1 && (
+                        <div className="absolute left-5 top-[40px] flex flex-col items-center" style={{ transform: "translateX(-50%)" }}>
+                          <div className={cn(
+                            "w-[2px] h-8", 
+                            isCompleted ? "bg-blue-500" : "bg-gray-200"
+                          )}></div>
+                          <ArrowDown 
+                            className={cn(
+                              "h-4 w-4 -mt-1", 
+                              isCompleted ? "text-blue-500" : "text-gray-200"
+                            )} 
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* Centered delete button */}
+        <div className="mt-6 pt-6 border-t flex justify-center">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200 hover:border-red-300"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Application
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete your application.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleRemove} className="bg-red-500 hover:bg-red-600">
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </DialogContent>
     </Dialog>

@@ -6,8 +6,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Share2, ArrowLeft, Mic, Play, Download, CheckCircle } from "lucide-react";
-import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { Share2, ArrowLeft, Mic, Play, Download, CheckCircle, Bookmark, BookmarkCheck } from "lucide-react";
+import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "@/app/config/firebase";
 import { auth } from "@/app/config/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -41,6 +41,9 @@ export default function JobDetails() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [hasApplied, setHasApplied] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [applicationForm, setApplicationForm] = useState({
     name: "",
     email: "",
@@ -48,6 +51,7 @@ export default function JobDetails() {
     coverLetter: "",
     termsAccepted: false
   });
+  const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
 
   // Check authentication status
   useEffect(() => {
@@ -72,6 +76,12 @@ export default function JobDetails() {
               phone: userData.phone || user.phoneNumber || ""
             }));
           }
+          
+          // Check if user has already applied for this job
+          await checkApplicationStatus(user.uid, jobId);
+          
+          // Check if user has saved this job
+          await checkSavedStatus(user.uid, jobId);
         } catch (err) {
           console.error("Error fetching user data:", err);
         }
@@ -79,7 +89,41 @@ export default function JobDetails() {
     });
     
     return () => unsubscribe();
-  }, []);
+  }, [jobId]);
+
+  // Function to check if user has already applied for this job
+  const checkApplicationStatus = async (userId: string, jobId: string) => {
+    try {
+      const applicationsRef = collection(db, "applications");
+      const q = query(
+        applicationsRef,
+        where("userId", "==", userId),
+        where("jobId", "==", jobId)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      setHasApplied(!querySnapshot.empty);
+    } catch (err) {
+      console.error("Error checking application status:", err);
+    }
+  };
+
+  // Function to check if user has saved this job
+  const checkSavedStatus = async (userId: string, jobId: string) => {
+    try {
+      const savedJobsRef = collection(db, "savedJobs");
+      const q = query(
+        savedJobsRef,
+        where("userId", "==", userId),
+        where("jobId", "==", jobId)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      setIsSaved(!querySnapshot.empty);
+    } catch (err) {
+      console.error("Error checking saved status:", err);
+    }
+  };
 
   useEffect(() => {
     // Public data fetching - no auth required
@@ -204,6 +248,12 @@ export default function JobDetails() {
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Prevent reapplying if already applied
+    if (hasApplied) {
+      toast.info("You have already applied to this job");
+      return;
+    }
+    
     if (!applicationForm.name.trim()) {
       toast.error("Please enter your name");
       return;
@@ -244,6 +294,9 @@ export default function JobDetails() {
       
       await addDoc(collection(db, "applications"), applicationData);
       
+      // Update application status
+      setHasApplied(true);
+      
       // Show success message
       setIsSubmitted(true);
       toast.success("Application submitted successfully!");
@@ -262,6 +315,106 @@ export default function JobDetails() {
       toast.error("Failed to submit application. Please try again.");
     } finally {
       setIsApplying(false);
+    }
+  };
+
+  // Add a new function to handle application removal
+  const handleRemoveApplication = async () => {
+    if (!currentUser) {
+      toast.error("You must be logged in to remove an application");
+      return;
+    }
+    
+    try {
+      // Find the application document
+      const applicationsRef = collection(db, "applications");
+      const q = query(
+        applicationsRef,
+        where("userId", "==", currentUser.uid),
+        where("jobId", "==", jobId)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        toast.error("Application not found");
+        return;
+      }
+      
+      // Delete the application document
+      const batch = await import("firebase/firestore").then(module => module.writeBatch(db));
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      
+      await batch.commit();
+      
+      // Update state
+      setHasApplied(false);
+      setIsSubmitted(false);
+      
+      toast.success("Application removed successfully");
+    } catch (err) {
+      console.error("Error removing application:", err);
+      toast.error("Failed to remove application");
+    }
+  };
+
+  // Function to save or unsave job
+  const handleSaveJob = async () => {
+    if (!currentUser) {
+      toast.error("Please login to save jobs");
+      router.push("/login");
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      if (isSaved) {
+        // Unsave the job
+        const savedJobsRef = collection(db, "savedJobs");
+        const q = query(
+          savedJobsRef,
+          where("userId", "==", currentUser.uid),
+          where("jobId", "==", jobId)
+        );
+        
+        const querySnapshot = await getDocs(q);
+        const batch = writeBatch(db);
+        
+        querySnapshot.forEach((document) => {
+          batch.delete(doc(db, "savedJobs", document.id));
+        });
+        
+        await batch.commit();
+        setIsSaved(false);
+        toast.success("Job removed from saved jobs");
+      } else {
+        // Save the job
+        await addDoc(collection(db, "savedJobs"), {
+          userId: currentUser.uid,
+          jobId: jobId,
+          job: {
+            id: job.id,
+            title: job.title,
+            company: job.company,
+            location: job.location,
+            salary: job.rate,
+            type: job.type,
+            postedDate: job.postedDate,
+          },
+          savedAt: serverTimestamp()
+        });
+        
+        setIsSaved(true);
+        toast.success("Job saved successfully");
+      }
+    } catch (err) {
+      console.error("Error saving/unsaving job:", err);
+      toast.error("Failed to save job. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -299,12 +452,41 @@ export default function JobDetails() {
 
   return (
     <MainLayout activeLink="jobs">
-      <div className="container mx-auto px-4 py-8">
-        <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Jobs
-        </Link>
-
+      <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="mb-6 flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="mr-2">
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            <span className="hidden sm:inline">Back</span>
+          </Button>
+          
+          <div className="flex-1" />
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex items-center gap-1"
+            disabled={isSaving}
+            onClick={handleSaveJob}
+          >
+            {isSaved ? (
+              <>
+                <BookmarkCheck className="h-4 w-4" />
+                <span className="hidden sm:inline">Saved</span>
+              </>
+            ) : (
+              <>
+                <Bookmark className="h-4 w-4" />
+                <span className="hidden sm:inline">Save</span>
+              </>
+            )}
+          </Button>
+          
+          <Button variant="ghost" size="sm" className="flex items-center gap-1">
+            <Share2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Share</span>
+          </Button>
+        </div>
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
@@ -581,117 +763,192 @@ export default function JobDetails() {
                 </div>
               </CardContent>
               <CardFooter>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button className="w-full">Apply Now</Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                    {isSubmitted ? (
-                      <div className="py-6 text-center">
-                        <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                          <CheckCircle className="h-6 w-6 text-primary" />
-                        </div>
-                        <DialogTitle className="text-xl mb-2">Application Submitted!</DialogTitle>
-                        <DialogDescription>
-                          Your application for {job.title} at {job.company} has been sent successfully.
-                          <br /><br />
-                          The employer will contact you if they are interested in your application.
-                        </DialogDescription>
-                        <div className="mt-6 flex flex-col space-y-2">
-                          <Button 
-                            onClick={() => {
-                              setIsSubmitted(false);
-                              router.push("/");
-                            }}
-                          >
-                            Browse More Jobs
-                          </Button>
-                          <DialogClose asChild>
-                            <Button variant="outline">Close</Button>
-                          </DialogClose>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <DialogHeader>
-                          <DialogTitle>Apply for {job.title}</DialogTitle>
-                          <DialogDescription>
-                            Fill out the form below to apply for this position at {job.company}.
-                            {!currentUser && (
-                              <div className="mt-2">
-                                <Link href={`/login?redirect=/jobs/${jobId}`} className="text-primary hover:underline">
-                                  Sign in
-                                </Link> to automatically fill your details.
-                              </div>
-                            )}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleApply}>
-                          <div className="grid gap-4 py-4">
-                            <div className="grid gap-2">
-                              <Label htmlFor="name">Full Name</Label>
-                              <Input
-                                id="name"
-                                name="name"
-                                value={applicationForm.name}
-                                onChange={handleChange}
-                                required
-                              />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="email">Email {currentUser ? "" : "(Optional)"}</Label>
-                              <Input
-                                id="email"
-                                name="email"
-                                type="email"
-                                value={applicationForm.email}
-                                onChange={handleChange}
-                                required={!!currentUser}
-                              />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="phone">Phone Number</Label>
-                              <Input
-                                id="phone"
-                                name="phone"
-                                type="tel"
-                                value={applicationForm.phone}
-                                onChange={handleChange}
-                                required
-                              />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label htmlFor="coverLetter">Why are you interested in this job? (Optional)</Label>
-                              <Textarea
-                                id="coverLetter"
-                                name="coverLetter"
-                                value={applicationForm.coverLetter}
-                                onChange={handleChange}
-                                className="min-h-[100px]"
-                              />
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox 
-                                id="terms" 
-                                checked={applicationForm.termsAccepted}
-                                onCheckedChange={handleCheckboxChange}
-                                required
-                              />
-                              <Label htmlFor="terms" className="text-sm">
-                                I agree to be contacted about this job opportunity
-                              </Label>
-                            </div>
+                <div className="w-full flex gap-2">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button 
+                        className={hasApplied ? "flex-1" : "w-full"} 
+                        variant={hasApplied ? "outline" : "default"}
+                        disabled={job.status !== "Active" || (hasApplied && !isSubmitted)}
+                      >
+                        {hasApplied 
+                          ? "Already Applied" 
+                          : job.status !== "Active"
+                            ? "Applications Closed"
+                            : "Apply Now"
+                        }
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      {isSubmitted ? (
+                        <div className="py-6 text-center">
+                          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                            <CheckCircle className="h-6 w-6 text-primary" />
                           </div>
+                          <DialogTitle className="text-xl mb-2">Application Submitted!</DialogTitle>
+                          <DialogDescription>
+                            Your application for {job.title} at {job.company} has been sent successfully.
+                            <br /><br />
+                            The employer will contact you if they are interested in your application.
+                          </DialogDescription>
+                          <div className="mt-6 flex flex-col space-y-2">
+                            <Button 
+                              onClick={() => {
+                                setIsSubmitted(false);
+                                router.push("/");
+                              }}
+                            >
+                              Browse More Jobs
+                            </Button>
+                            <DialogClose asChild>
+                              <Button variant="outline">Close</Button>
+                            </DialogClose>
+                          </div>
+                        </div>
+                      ) : hasApplied ? (
+                        <div className="py-6 text-center">
+                          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                            <CheckCircle className="h-6 w-6 text-primary" />
+                          </div>
+                          <DialogTitle className="text-xl mb-2">Already Applied!</DialogTitle>
+                          <DialogDescription>
+                            You have already applied for {job.title} at {job.company}.
+                            <br /><br />
+                            The employer will contact you if they are interested in your application.
+                          </DialogDescription>
+                          <div className="mt-6 flex flex-col space-y-2">
+                            <DialogClose asChild>
+                              <Button variant="outline">Close</Button>
+                            </DialogClose>
+                            <Button 
+                              variant="destructive" 
+                              onClick={() => setIsRemoveDialogOpen(true)}
+                            >
+                              Remove Application
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <DialogHeader>
+                            <DialogTitle>Apply for {job.title}</DialogTitle>
+                            <DialogDescription>
+                              Fill out the form below to apply for this position at {job.company}.
+                              {!currentUser && (
+                                <div className="mt-2">
+                                  <Link href={`/login?redirect=/jobs/${jobId}`} className="text-primary hover:underline">
+                                    Sign in
+                                  </Link> to automatically fill your details.
+                                </div>
+                              )}
+                            </DialogDescription>
+                          </DialogHeader>
+                          <form onSubmit={handleApply}>
+                            <div className="grid gap-4 py-4">
+                              <div className="grid gap-2">
+                                <Label htmlFor="name">Full Name</Label>
+                                <Input
+                                  id="name"
+                                  name="name"
+                                  value={applicationForm.name}
+                                  onChange={handleChange}
+                                  required
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <Label htmlFor="email">Email {currentUser ? "" : "(Optional)"}</Label>
+                                <Input
+                                  id="email"
+                                  name="email"
+                                  type="email"
+                                  value={applicationForm.email}
+                                  onChange={handleChange}
+                                  required={!!currentUser}
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <Label htmlFor="phone">Phone Number</Label>
+                                <Input
+                                  id="phone"
+                                  name="phone"
+                                  type="tel"
+                                  value={applicationForm.phone}
+                                  onChange={handleChange}
+                                  required
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <Label htmlFor="coverLetter">Why are you interested in this job? (Optional)</Label>
+                                <Textarea
+                                  id="coverLetter"
+                                  name="coverLetter"
+                                  value={applicationForm.coverLetter}
+                                  onChange={handleChange}
+                                  className="min-h-[100px]"
+                                />
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                  id="terms" 
+                                  checked={applicationForm.termsAccepted}
+                                  onCheckedChange={handleCheckboxChange}
+                                  required
+                                />
+                                <Label htmlFor="terms" className="text-sm">
+                                  I agree to be contacted about this job opportunity
+                                </Label>
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button type="submit" disabled={isApplying}>
+                                {isApplying ? "Submitting..." : "Submit Application"}
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        </>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                  
+                  {hasApplied && currentUser && (
+                    <>
+                      <Button 
+                        variant="destructive" 
+                        className="flex-1"
+                        onClick={() => setIsRemoveDialogOpen(true)}
+                      >
+                        Remove Application
+                      </Button>
+
+                      {/* Confirmation Dialog */}
+                      <Dialog open={isRemoveDialogOpen} onOpenChange={setIsRemoveDialogOpen}>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Confirm Removal</DialogTitle>
+                            <DialogDescription>
+                              Are you sure you want to remove your application for {job.title} at {job.company}?
+                              This action cannot be undone.
+                            </DialogDescription>
+                          </DialogHeader>
                           <DialogFooter>
-                            <Button type="submit" disabled={isApplying}>
-                              {isApplying ? "Submitting..." : "Submit Application"}
+                            <Button variant="outline" onClick={() => setIsRemoveDialogOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              onClick={() => {
+                                handleRemoveApplication();
+                                setIsRemoveDialogOpen(false);
+                              }}
+                            >
+                              Confirm
                             </Button>
                           </DialogFooter>
-                        </form>
-                      </>
-                    )}
-                  </DialogContent>
-                </Dialog>
+                        </DialogContent>
+                      </Dialog>
+                    </>
+                  )}
+                </div>
               </CardFooter>
             </Card>
           </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import DashboardLayout from "@/components/dashboard/dashboard-layout"
@@ -8,31 +8,91 @@ import JobStatusCard from "@/components/dashboard/job-status-card"
 import JobTimeline from "@/components/dashboard/job-timeline"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
-import { Briefcase, Calendar, Clock, MapPin, Star } from "lucide-react"
+import { Briefcase, Calendar, Clock, MapPin, Star, AlertCircle } from "lucide-react"
 import { RupeeIcon } from "@/components/ui/rupee-icon"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { jobsApi } from "@/utils/api"
 import type { JobStatus } from "@/types/job"
+import { useAuth } from "@/hooks/useAuth"
+import { useRouter } from "next/navigation"
 
 export default function JobStatusPage() {
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
+  
   const [selectedTab, setSelectedTab] = useState("all")
   const [selectedJob, setSelectedJob] = useState<JobStatus | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  
+  const [jobs, setJobs] = useState<JobStatus[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Redirect if not authenticated
+    if (!authLoading && !user) {
+      router.push('/login?redirect=/dashboard/job-status')
+      return
+    }
+
+    // Don't fetch data until authentication is complete
+    if (authLoading || !user) return
+
+    const fetchJobs = async () => {
+      try {
+        setLoading(true)
+        const data = await jobsApi.getUserJobStatus(user.uid)
+        setJobs(data.jobs)
+        setError(null)
+      } catch (err: any) {
+        console.error('Failed to fetch jobs:', err)
+        setError(err?.message || 'Failed to load your job status. Please try again later.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchJobs()
+  }, [user, authLoading, router])
 
   const handleViewDetails = (jobId: string) => {
-    const job = allJobs.find((job) => job.id === jobId)
+    const job = jobs.find((job) => job.id === jobId)
     if (job) {
       setSelectedJob(job)
       setIsDialogOpen(true)
     }
   }
 
-  const filteredJobs = selectedTab === "all" ? allJobs : allJobs.filter((job) => job.status === selectedTab)
+  const filteredJobs = selectedTab === "all" ? jobs : jobs.filter((job) => job.status === selectedTab)
+
+  // During auth loading, show nothing, as the layout will handle this
+  if (authLoading) {
+    return null
+  }
+
+  // If user is not authenticated, don't show anything as we're redirecting
+  if (!user) {
+    return null
+  }
+
+  // Content loading state is handled by loading.tsx
+  if (loading) {
+    return null
+  }
 
   return (
     <DashboardLayout activeRoute="job-status">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Job Status</h1>
-        <Button>Find More Jobs</Button>
+        <Button onClick={() => router.push('/jobs')}>Find More Jobs</Button>
       </div>
+
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="all" value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList className="grid grid-cols-6 mb-6">
@@ -80,7 +140,7 @@ export default function JobStatusPage() {
                   <div className="space-y-3">
                     <div className="flex items-center">
                       <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                      <span>{selectedJob.location}</span>
+                      <span>{selectedJob.location.display || `${selectedJob.location.city}, ${selectedJob.location.state}`}</span>
                     </div>
                     <div className="flex items-center">
                       <RupeeIcon className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -170,108 +230,4 @@ export default function JobStatusPage() {
     </DashboardLayout>
   )
 }
-
-// Sample job data
-const allJobs: JobStatus[] = [
-  {
-    id: "1",
-    title: "Weekend Barista",
-    company: "Coffee House",
-    location: "San Francisco, CA",
-    hours: "10-15 hours/week",
-    rate: "₹1350-1650/hour",
-    duration: "3 months",
-    type: "Part-time",
-    appliedDate: "May 10, 2023",
-    status: "applied",
-    postedDate: "May 8, 2023",
-  },
-  {
-    id: "2",
-    title: "Event Photographer",
-    company: "EventPro Agency",
-    location: "Remote",
-    hours: "Flexible hours",
-    rate: "₹1875-2625/hour",
-    duration: "One-time event",
-    type: "Contract",
-    appliedDate: "May 5, 2023",
-    approvedDate: "May 7, 2023",
-    status: "approved",
-    postedDate: "May 3, 2023",
-  },
-  {
-    id: "3",
-    title: "Social Media Assistant",
-    company: "Digital Marketing Co.",
-    location: "Remote",
-    rate: "₹1500-1875/hour",
-    hours: "15-20 hours/week",
-    duration: "6 months",
-    type: "Part-time",
-    appliedDate: "April 28, 2023",
-    approvedDate: "May 1, 2023",
-    startDate: "May 5, 2023",
-    status: "in-progress",
-    postedDate: "April 25, 2023",
-  },
-  {
-    id: "4",
-    title: "Web Developer",
-    company: "Tech Solutions Inc.",
-    location: "Remote",
-    rate: "₹2250-3000/hour",
-    hours: "20-30 hours/week",
-    duration: "Contract",
-    type: "Contract",
-    appliedDate: "April 15, 2023",
-    approvedDate: "April 18, 2023",
-    startDate: "April 20, 2023",
-    endDate: "May 5, 2023",
-    status: "completed",
-    paymentStatus: "pending",
-    paymentAmount: "₹90,000",
-    postedDate: "April 10, 2023",
-  },
-  {
-    id: "5",
-    title: "Data Entry Specialist",
-    company: "Business Services",
-    location: "Remote",
-    rate: "₹1350-1650/hour",
-    hours: "10-15 hours/week",
-    duration: "Temporary",
-    type: "Temporary",
-    appliedDate: "April 1, 2023",
-    approvedDate: "April 3, 2023",
-    startDate: "April 5, 2023",
-    endDate: "April 20, 2023",
-    status: "paid",
-    paymentStatus: "paid",
-    paymentAmount: "₹48,750",
-    paymentDate: "April 25, 2023",
-    rating: 5,
-    postedDate: "March 28, 2023",
-  },
-  {
-    id: "6",
-    title: "Customer Support",
-    company: "Service Pro",
-    location: "Austin, TX",
-    rate: "₹1350-1650/hour",
-    hours: "Weekend shifts",
-    duration: "Ongoing",
-    type: "Weekend",
-    appliedDate: "March 15, 2023",
-    approvedDate: "March 18, 2023",
-    startDate: "March 20, 2023",
-    endDate: "April 10, 2023",
-    status: "paid",
-    paymentStatus: "paid",
-    paymentAmount: "₹60,000",
-    paymentDate: "April 15, 2023",
-    rating: 4,
-    postedDate: "March 10, 2023",
-  },
-]
 

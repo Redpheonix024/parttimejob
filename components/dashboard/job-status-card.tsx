@@ -5,22 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar, Clock, MapPin, Star } from "lucide-react"
 import { RupeeIcon } from "@/components/ui/rupee-icon"
+import type { JobStatus } from "@/types/job"
 
 interface JobStatusCardProps {
-  job: {
-    id: string
-    title: string
-    company: string
-    location: string
-    rate: string
-    startDate?: string
-    endDate?: string
-    status: "applied" | "approved" | "in-progress" | "completed" | "paid"
-    paymentStatus?: "pending" | "processing" | "paid"
-    paymentAmount?: string
-    paymentDate?: string
-    rating?: number
-  }
+  job: JobStatus
   onViewDetails: (jobId: string) => void
 }
 
@@ -40,7 +28,7 @@ export default function JobStatusCard({ job, onViewDetails }: JobStatusCardProps
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
           <div className="flex items-center">
             <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-            <span>{job.location}</span>
+            <span>{job.location.display || `${job.location.city}, ${job.location.state}`}</span>
           </div>
           <div className="flex items-center">
             <RupeeIcon className="h-4 w-4 mr-2 text-muted-foreground" />

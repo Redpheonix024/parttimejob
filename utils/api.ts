@@ -6,13 +6,15 @@ type ApiOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: any;
   headers?: Record<string, string>;
+  includeAuth?: boolean;
+  userId?: string;
 };
 
 /**
  * Generic API call function
  */
 export async function apiCall<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
-  const { method = 'GET', body, headers = {} } = options;
+  const { method = 'GET', body, headers = {}, includeAuth = false, userId } = options;
   
   const requestOptions: RequestInit = {
     method,
@@ -22,6 +24,14 @@ export async function apiCall<T>(endpoint: string, options: ApiOptions = {}): Pr
     },
     credentials: 'include',
   };
+
+  // Add authorization header if includeAuth is true and userId is provided
+  if (includeAuth && userId) {
+    requestOptions.headers = {
+      ...requestOptions.headers,
+      'Authorization': `Bearer ${userId}`
+    };
+  }
   
   if (body) {
     requestOptions.body = JSON.stringify(body);
@@ -71,6 +81,10 @@ export const jobsApi = {
   createJob: (jobData: any) => apiCall<{ job: any }>('jobs', { 
     method: 'POST', 
     body: jobData 
+  }),
+  getUserJobStatus: (userId?: string) => apiCall<{ jobs: any[] }>('user/job-status', {
+    includeAuth: true,
+    userId
   })
 };
 
