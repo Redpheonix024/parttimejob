@@ -14,6 +14,34 @@ export const metadata: Metadata = {
   description:
     "Connect with local part-time opportunities or find qualified people for your short-term tasks.",
   generator: "v0.dev",
+  manifest: "/manifest.json",
+  themeColor: "#000000",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Parttimejob",
+  },
+  icons: {
+    icon: "/icons/icon-192x192.png",
+    apple: "/icons/icon-192x192.png",
+  },
+  applicationName: "Parttimejob",
+  formatDetection: {
+    telephone: false,
+  },
+  openGraph: {
+    type: "website",
+    siteName: "Parttimejob",
+    title: "Parttimejob - Find Part-Time Jobs",
+    description:
+      "Connect with local part-time opportunities or find qualified people for your short-term tasks.",
+  },
 };
 
 export default function RootLayout({
@@ -32,6 +60,7 @@ export default function RootLayout({
         >
           <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>
+        <script src="/register-sw.js" async />
       </body>
     </html>
   );
