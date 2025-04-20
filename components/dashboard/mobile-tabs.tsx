@@ -1,13 +1,21 @@
-"use client"
+"use client";
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface MobileTabsProps {
-  activeTab: string
-  onTabChange: (value: string) => void
+  activeTab: string;
+  onTabChange: (value: string) => void;
 }
 
-export default function MobileTabs({ activeTab, onTabChange }: MobileTabsProps) {
+export default function MobileTabs({
+  activeTab,
+  onTabChange,
+}: MobileTabsProps) {
+  // Don't show tabs on settings and profile pages
+  if (activeTab === "settings" || activeTab === "profile") {
+    return null;
+  }
+
   return (
     <div className="md:hidden mb-6">
       <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
@@ -19,6 +27,5 @@ export default function MobileTabs({ activeTab, onTabChange }: MobileTabsProps) 
         </TabsList>
       </Tabs>
     </div>
-  )
+  );
 }
-

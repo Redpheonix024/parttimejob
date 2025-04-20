@@ -6,11 +6,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
-  Calendar,
   FileText,
   Home,
   LogOut,
-  MessageSquare,
   Settings,
   Star,
   User,
@@ -25,7 +23,7 @@ import { useState, useEffect } from "react";
 interface DashboardSidebarProps {
   activeRoute: string;
   isOpen?: boolean;
-  mobileOpen?: boolean; 
+  mobileOpen?: boolean;
   setMobileOpen?: (open: boolean) => void;
   userData?: any;
   user?: any;
@@ -42,43 +40,43 @@ export default function DashboardSidebar({
   const router = useRouter();
   const pathname = usePathname();
   const [isMobile, setIsMobile] = useState(false);
-  const [dashboardType, setDashboardType] = useState<'employee' | 'employer'>(
-    pathname?.includes('/dashboard/employer') ? 'employer' : 'employee'
+  const [dashboardType, setDashboardType] = useState<"employee" | "employer">(
+    pathname?.includes("/dashboard/employer") ? "employer" : "employee"
   );
 
   useEffect(() => {
     // Check if the current path is for employer dashboard
-    if (pathname?.includes('/dashboard/employer')) {
-      setDashboardType('employer');
+    if (pathname?.includes("/dashboard/employer")) {
+      setDashboardType("employer");
     } else {
-      setDashboardType('employee');
+      setDashboardType("employee");
     }
   }, [pathname]);
 
   useEffect(() => {
     // Check if the window is available (client-side)
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const checkMobile = () => {
         setIsMobile(window.innerWidth < 768);
       };
-      
+
       // Initial check
       checkMobile();
-      
+
       // Add event listener for window resize
-      window.addEventListener('resize', checkMobile);
-      
+      window.addEventListener("resize", checkMobile);
+
       // Clean up event listener
-      return () => window.removeEventListener('resize', checkMobile);
+      return () => window.removeEventListener("resize", checkMobile);
     }
   }, []);
 
-  const handleDashboardSwitch = (type: 'employee' | 'employer') => {
+  const handleDashboardSwitch = (type: "employee" | "employer") => {
     setDashboardType(type);
-    if (type === 'employer') {
-      router.push('/dashboard/employer');
+    if (type === "employer") {
+      router.push("/dashboard/employer");
     } else {
-      router.push('/dashboard');
+      router.push("/dashboard");
     }
   };
 
@@ -93,7 +91,7 @@ export default function DashboardSidebar({
   };
 
   const getNavigationItems = () => {
-    if (dashboardType === 'employer') {
+    if (dashboardType === "employer") {
       return (
         <>
           <NavItem
@@ -115,21 +113,6 @@ export default function DashboardSidebar({
             icon={<FileText className="h-5 w-5" />}
             label="Applicants"
             isActive={activeRoute === "applicants"}
-            isExpanded={isOpen}
-          />
-          <NavItem
-            href="/dashboard/employer/messages"
-            icon={<MessageSquare className="h-5 w-5" />}
-            label="Messages"
-            isActive={activeRoute === "messages"}
-            badge="3"
-            isExpanded={isOpen}
-          />
-          <NavItem
-            href="/dashboard/employer/calendar"
-            icon={<Calendar className="h-5 w-5" />}
-            label="Calendar"
-            isActive={activeRoute === "calendar"}
             isExpanded={isOpen}
           />
         </>
@@ -166,21 +149,6 @@ export default function DashboardSidebar({
           isActive={activeRoute === "saved-jobs"}
           isExpanded={isOpen}
         />
-        <NavItem
-          href="/dashboard/messages"
-          icon={<MessageSquare className="h-5 w-5" />}
-          label="Messages"
-          isActive={activeRoute === "messages"}
-          badge="3"
-          isExpanded={isOpen}
-        />
-        <NavItem
-          href="/dashboard/calendar"
-          icon={<Calendar className="h-5 w-5" />}
-          label="Calendar"
-          isActive={activeRoute === "calendar"}
-          isExpanded={isOpen}
-        />
       </>
     );
   };
@@ -206,21 +174,21 @@ export default function DashboardSidebar({
               </h3>
               <div className="flex space-x-2">
                 <button
-                  onClick={() => handleDashboardSwitch('employee')}
+                  onClick={() => handleDashboardSwitch("employee")}
                   className={`flex-1 px-2 py-1 text-xs rounded-md ${
-                    dashboardType === 'employee'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    dashboardType === "employee"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
                   }`}
                 >
                   <Briefcase className="h-4 w-4 mx-auto" />
                 </button>
                 <button
-                  onClick={() => handleDashboardSwitch('employer')}
+                  onClick={() => handleDashboardSwitch("employer")}
                   className={`flex-1 px-2 py-1 text-xs rounded-md ${
-                    dashboardType === 'employer'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    dashboardType === "employer"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
                   }`}
                 >
                   <Building2 className="h-4 w-4 mx-auto" />
@@ -265,15 +233,21 @@ export default function DashboardSidebar({
       <div className="p-4 border-t">
         <div className="flex items-center">
           <Avatar className="h-8 w-8">
-            <AvatarImage 
-              src={userData?.profilePicture || userData?.photoURL || "/placeholder.svg?height=32&width=32"} 
-              alt={user?.displayName || "User"} 
+            <AvatarImage
+              src={
+                userData?.profilePicture ||
+                userData?.photoURL ||
+                "/placeholder.svg?height=32&width=32"
+              }
+              alt={user?.displayName || "User"}
             />
             <AvatarFallback>{user?.displayName?.[0] || "U"}</AvatarFallback>
           </Avatar>
           {isOpen && (
             <div className="ml-3">
-              <p className="text-sm font-medium">{user?.displayName || "Complete Profile"}</p>
+              <p className="text-sm font-medium">
+                {user?.displayName || "Complete Profile"}
+              </p>
               <p className="text-xs text-muted-foreground">
                 {user?.email || "Add your details"}
               </p>
@@ -289,9 +263,7 @@ export default function DashboardSidebar({
     return (
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="p-0 w-[280px]">
-          <div className="flex flex-col h-full">
-            {sidebarContent}
-          </div>
+          <div className="flex flex-col h-full">{sidebarContent}</div>
         </SheetContent>
       </Sheet>
     );

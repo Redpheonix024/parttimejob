@@ -161,9 +161,6 @@ export default function Contact() {
                             <SelectItem value="support">
                               Technical Support
                             </SelectItem>
-                            <SelectItem value="billing">
-                              Billing Question
-                            </SelectItem>
                             <SelectItem value="feedback">Feedback</SelectItem>
                             <SelectItem value="partnership">
                               Partnership Opportunity
