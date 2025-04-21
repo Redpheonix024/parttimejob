@@ -1,7 +1,11 @@
 {
-  "name": "my-v0-project",
+  "name": "job-search",
   "version": "0.1.0",
   "private": true,
+  "author": {
+    "name": "Jishnu",
+    "call me": "Redpheonix"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

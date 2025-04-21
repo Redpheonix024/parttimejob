@@ -1,6 +1,6 @@
 {
-  "name": "My V0 Project",
-  "short_name": "V0",
+  "name": "job-search",
+  "short_name": "JS",
   "description": "A modern web application",
   "start_url": "/",
   "display": "standalone",
