@@ -18,6 +18,7 @@ import {
   getDocs,
   getDoc,
   doc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "@/app/config/firebase";
 import { useAuth } from "@/hooks/useAuth";
@@ -99,7 +100,7 @@ export default function Applications() {
             }
           }
 
-          return {
+          const application = {
             id: docSnapshot.id,
             jobTitle: data.jobTitle,
             company: data.company,
@@ -109,9 +110,12 @@ export default function Applications() {
             appliedDate: data.createdAt
               ? format(data.createdAt.toDate(), "MMM d, yyyy")
               : "N/A",
-            status: data.status || "applied",
+            status: data.status || "Applied",
             jobId: data.jobId,
           };
+
+          // console.log("Fetched application:", application);
+          return application;
         })
       );
 
@@ -123,11 +127,26 @@ export default function Applications() {
       });
 
       setApplications(sortedApplications);
+      // console.log("Updated applications state:", sortedApplications);
     } catch (error) {
       console.error("Error fetching applications:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStatusChange = (applicationId: string, newStatus: string) => {
+    console.log("Status change requested:", { applicationId, newStatus });
+    setApplications((prevApplications) => {
+      const updatedApplications = prevApplications.map((app) =>
+        app.id === applicationId ? { ...app, status: newStatus } : app
+      );
+      console.log(
+        "Updated applications after status change:",
+        updatedApplications
+      );
+      return updatedApplications;
+    });
   };
 
   useEffect(() => {
@@ -166,6 +185,7 @@ export default function Applications() {
                   key={application.id}
                   application={application}
                   onRemove={() => handleRemoveApplication(application.id)}
+                  onStatusChange={handleStatusChange}
                 />
               ))}
             </div>
