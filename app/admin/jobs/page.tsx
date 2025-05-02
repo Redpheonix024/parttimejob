@@ -1,11 +1,10 @@
 "use client";
 
-import React from "react";
-import { useState, useEffect } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import AdminSidebar from "@/components/layout/admin-sidebar";
-import AdminHeader from "@/components/layout/admin-header";
+import AdminSidebar from "@/components/admin/admin-sidebar";
+import AdminHeader from "@/components/admin/admin-header";
 import {
   Card,
   CardContent,
@@ -58,45 +57,42 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { collection, getDocs, query, where, orderBy, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+} from "firebase/firestore";
 import { db } from "@/app/config/firebase";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { Job } from "@/types/job";
 
-interface Job {
-  id: string;
-  title: string;
-  company: string;
-  category: string;
-  location: string;
-  postedDate: string;
-  status: string;
-  rate: string;
-  duration: string;
-  applications: number;
-  userId: string;
-}
+const ITEMS_PER_PAGE = 10;
 
 const formatDate = (timestamp: any) => {
-  if (!timestamp) return 'N/A';
-  
+  if (!timestamp) return "N/A";
+
   try {
     if (timestamp instanceof Timestamp) {
-      return format(timestamp.toDate(), 'MMM d, yyyy');
+      return format(timestamp.toDate(), "MMM d, yyyy");
     }
     if (timestamp.toDate) {
-      return format(timestamp.toDate(), 'MMM d, yyyy');
+      return format(timestamp.toDate(), "MMM d, yyyy");
     }
-    if (typeof timestamp === 'string') {
-      return format(new Date(timestamp), 'MMM d, yyyy');
+    if (typeof timestamp === "string") {
+      return format(new Date(timestamp), "MMM d, yyyy");
     }
-    if (typeof timestamp === 'number') {
-      return format(new Date(timestamp), 'MMM d, yyyy');
+    if (typeof timestamp === "number") {
+      return format(new Date(timestamp), "MMM d, yyyy");
     }
-    return 'N/A';
+    return "N/A";
   } catch (error) {
-    console.error('Error formatting date:', error);
-    return 'N/A';
+    console.error("Error formatting date:", error);
+    return "N/A";
   }
 };
 
@@ -109,67 +105,95 @@ export default function AdminJobs() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastVisible, setLastVisible] = useState<any>(null);
+  const [hasMore, setHasMore] = useState(true);
 
-  useEffect(() => {
-    const fetchJobs = async () => {
+  const fetchJobs = useCallback(
+    async (isInitial = false) => {
       try {
+        setIsLoading(true);
         console.log("Fetching jobs...");
         const jobsRef = collection(db, "jobs");
-        let q = query(jobsRef, orderBy("createdAt", "desc"));
+        let q = query(
+          jobsRef,
+          orderBy("createdAt", "desc"),
+          limit(ITEMS_PER_PAGE)
+        );
 
         // Apply status filter if not "all"
         if (statusFilter !== "all") {
           q = query(q, where("status", "==", statusFilter));
         }
 
+        // If not initial load and we have a last visible document, start after it
+        if (!isInitial && lastVisible) {
+          q = query(q, startAfter(lastVisible));
+        }
+
         const querySnapshot = await getDocs(q);
         console.log("Number of jobs found:", querySnapshot.size);
-        
-        const jobsData = querySnapshot.docs.map(doc => {
+
+        // Update last visible document
+        const lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+        setLastVisible(lastDoc);
+        setHasMore(querySnapshot.docs.length === ITEMS_PER_PAGE);
+
+        const jobsData = querySnapshot.docs.map((doc) => {
           const data = doc.data();
           console.log("Job data:", data);
           return {
             id: doc.id,
-            title: data.title || '',
-            company: data.company || '',
-            category: data.category || '',
-            location: data.location?.address || 'Remote',
+            title: data.title || "",
+            company: data.company || "",
+            category: data.category || "",
+            location: data.location?.address || "Remote",
             postedDate: formatDate(data.createdAt),
-            status: data.status || 'pending',
-            rate: data.salaryAmount ? `₹${data.salaryAmount}/${data.salaryType}` : 'Not specified',
-            duration: data.duration || 'Not specified',
+            status: data.status || "pending",
+            rate: data.salaryAmount
+              ? `₹${data.salaryAmount}/${data.salaryType}`
+              : "Not specified",
+            duration: data.duration || "Not specified",
             applications: data.applications?.length || 0,
-            userId: data.userId || ''
+            userId: data.userId || "",
           };
         }) as Job[];
-        
-        setJobs(jobsData);
+
+        setJobs((prevJobs) =>
+          isInitial ? jobsData : [...prevJobs, ...jobsData]
+        );
       } catch (err) {
         console.error("Error fetching jobs:", err);
         toast.error("Failed to load jobs. Please try again later.");
       } finally {
         setIsLoading(false);
       }
-    };
+    },
+    [statusFilter, lastVisible]
+  );
 
-    fetchJobs();
+  // Initial load
+  useEffect(() => {
+    fetchJobs(true);
   }, [statusFilter]);
 
+  // Load more function
+  const loadMore = useCallback(() => {
+    if (!isLoading && hasMore) {
+      fetchJobs(false);
+    }
+  }, [isLoading, hasMore, fetchJobs]);
+
+  // Filter jobs based on search query
   const filteredJobs = jobs.filter((job) => {
-    const matchesSearch =
-      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.location.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesCategory =
-      categoryFilter === "all" ||
-      job.category.toLowerCase() === categoryFilter.toLowerCase();
-
-    const matchesStatus =
-      statusFilter === "all" ||
-      job.status.toLowerCase() === statusFilter.toLowerCase();
-
-    return matchesSearch && matchesCategory && matchesStatus;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        job.title.toLowerCase().includes(query) ||
+        job.company.toLowerCase().includes(query) ||
+        job.location.toLowerCase().includes(query)
+      );
+    }
+    return true;
   });
 
   const handleLogout = () => {
@@ -188,15 +212,13 @@ export default function AdminJobs() {
               <Briefcase className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <Link 
+              <Link
                 href={`/admin/jobs/${job.id}`}
                 className="font-medium hover:underline"
               >
                 {job.title}
               </Link>
-              <div className="text-sm text-muted-foreground">
-                {job.company}
-              </div>
+              <div className="text-sm text-muted-foreground">{job.company}</div>
             </div>
           </div>
         );
@@ -207,9 +229,7 @@ export default function AdminJobs() {
       header: "Category",
       cell: ({ row }) => {
         const job = row.original;
-        return (
-          <Badge variant="secondary">{job.category}</Badge>
-        );
+        return <Badge variant="secondary">{job.category}</Badge>;
       },
     },
     {
@@ -287,115 +307,16 @@ export default function AdminJobs() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
-      <div
-        className={`bg-card border-r h-screen sticky top-0 transition-all duration-300 ${
-          isSidebarOpen ? "w-64" : "w-20"
-        }`}
-      >
-        <div className="p-4 border-b flex items-center justify-between">
-          <Link
-            href="/admin/dashboard"
-            className={`font-bold text-primary flex items-center ${
-              isSidebarOpen ? "text-xl" : "text-xs"
-            }`}
-          >
-            {isSidebarOpen ? (
-              "Parttimejob Admin"
-            ) : (
-              <Shield className="h-6 w-6" />
-            )}
-          </Link>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="md:flex hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </div>
-        <div className="py-4">
-          <nav className="space-y-1 px-2">
-            <NavItem
-              href="/admin/dashboard"
-              icon={<Home />}
-              label="Dashboard"
-              isExpanded={isSidebarOpen}
-            />
-            <NavItem
-              href="/admin/users"
-              icon={<Users />}
-              label="Users"
-              isExpanded={isSidebarOpen}
-            />
-            <NavItem
-              href="/admin/jobs"
-              icon={<Briefcase />}
-              label="Jobs"
-              isExpanded={isSidebarOpen}
-              isActive
-            />
-            <NavItem
-              href="/admin/settings"
-              icon={<Settings />}
-              label="Settings"
-              isExpanded={isSidebarOpen}
-            />
-          </nav>
-        </div>
-        <div className="absolute bottom-0 w-full p-4 border-t">
-          <Button
-            variant="ghost"
-            className={`w-full justify-start ${
-              isSidebarOpen ? "" : "justify-center px-2"
-            }`}
-            onClick={handleLogout}
-          >
-            <LogOut className={`h-5 w-5 ${isSidebarOpen ? "mr-2" : ""}`} />
-            {isSidebarOpen && "Logout"}
-          </Button>
-        </div>
-      </div>
+      <AdminSidebar
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+        activeLink="jobs"
+        onLogout={handleLogout}
+      />
 
       {/* Main content */}
       <div className="flex-1 min-w-0 overflow-auto">
-        <header className="bg-background border-b sticky top-0 z-10">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center md:hidden">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="flex-1 max-w-md hidden md:block">
-              <h1 className="text-xl font-bold">Job Management</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-primary"></span>
-              </Button>
-              <div className="flex items-center gap-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage
-                    src="/placeholder.svg?height=32&width=32"
-                    alt="Admin"
-                  />
-                  <AvatarFallback>AD</AvatarFallback>
-                </Avatar>
-                <div className="hidden md:block">
-                  <p className="text-sm font-medium">Admin User</p>
-                  <p className="text-xs text-muted-foreground">
-                    admin@Parttimejob.com
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <AdminHeader toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
         <main className="container mx-auto px-4 py-8">
           <div className="md:hidden mb-6">
@@ -488,7 +409,7 @@ export default function AdminJobs() {
                               <Briefcase className="h-5 w-5 text-primary" />
                             </div>
                             <div>
-                              <Link 
+                              <Link
                                 href={`/admin/jobs/${job.id}`}
                                 className="font-medium hover:underline"
                               >
@@ -579,42 +500,28 @@ export default function AdminJobs() {
               <Download className="h-4 w-4" />
               Export Jobs
             </Button>
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Job
-            </Button>
+            <Link href="/post-job">
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add Job
+              </Button>
+            </Link>
           </div>
+
+          {/* Add infinite scroll or load more button */}
+          {hasMore && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={loadMore}
+                disabled={isLoading}
+                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50"
+              >
+                {isLoading ? "Loading..." : "Load More"}
+              </button>
+            </div>
+          )}
         </main>
       </div>
     </div>
-  );
-}
-
-// Navigation Item Component
-function NavItem({
-  href,
-  icon,
-  label,
-  isExpanded,
-  isActive,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-  isExpanded: boolean;
-  isActive?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center px-3 py-2 text-sm rounded-md ${
-        isActive
-          ? "bg-primary/10 text-primary font-medium"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-      }`}
-    >
-      <div className={isExpanded ? "mr-3" : ""}>{icon}</div>
-      {isExpanded && <span className="flex-1">{label}</span>}
-    </Link>
   );
 }

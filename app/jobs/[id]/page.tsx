@@ -4,10 +4,36 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Share2, ArrowLeft, Mic, Play, Download, CheckCircle, Bookmark, BookmarkCheck } from "lucide-react";
-import { doc, getDoc, collection, addDoc, serverTimestamp, query, where, getDocs, writeBatch } from "firebase/firestore";
+import {
+  Share2,
+  ArrowLeft,
+  Mic,
+  Play,
+  Download,
+  CheckCircle,
+  Bookmark,
+  BookmarkCheck,
+} from "lucide-react";
+import {
+  doc,
+  getDoc,
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+  writeBatch,
+} from "firebase/firestore";
 import { db } from "@/app/config/firebase";
 import { auth } from "@/app/config/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -21,7 +47,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogClose
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +59,7 @@ export default function JobDetails() {
   const params = useParams();
   const router = useRouter();
   const jobId = params.id as string;
-  
+
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +75,7 @@ export default function JobDetails() {
     email: "",
     phone: "",
     coverLetter: "",
-    termsAccepted: false
+    termsAccepted: false,
   });
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
 
@@ -57,7 +83,7 @@ export default function JobDetails() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      
+
       if (user) {
         try {
           // Fetch user profile from Firestore
@@ -65,21 +91,22 @@ export default function JobDetails() {
           if (userDoc.exists()) {
             const userData = userDoc.data();
             setUserProfile(userData);
-            
+
             // Pre-fill the form with user data
-            setApplicationForm(prev => ({
+            setApplicationForm((prev) => ({
               ...prev,
-              name: userData.firstName && userData.lastName 
-                ? `${userData.firstName} ${userData.lastName}` 
-                : userData.displayName || user.displayName || "",
+              name:
+                userData.firstName && userData.lastName
+                  ? `${userData.firstName} ${userData.lastName}`
+                  : userData.displayName || user.displayName || "",
               email: userData.email || user.email || "",
-              phone: userData.phone || user.phoneNumber || ""
+              phone: userData.phone || user.phoneNumber || "",
             }));
           }
-          
+
           // Check if user has already applied for this job
           await checkApplicationStatus(user.uid, jobId);
-          
+
           // Check if user has saved this job
           await checkSavedStatus(user.uid, jobId);
         } catch (err) {
@@ -87,7 +114,7 @@ export default function JobDetails() {
         }
       }
     });
-    
+
     return () => unsubscribe();
   }, [jobId]);
 
@@ -100,7 +127,7 @@ export default function JobDetails() {
         where("userId", "==", userId),
         where("jobId", "==", jobId)
       );
-      
+
       const querySnapshot = await getDocs(q);
       setHasApplied(!querySnapshot.empty);
     } catch (err) {
@@ -117,7 +144,7 @@ export default function JobDetails() {
         where("userId", "==", userId),
         where("jobId", "==", jobId)
       );
-      
+
       const querySnapshot = await getDocs(q);
       setIsSaved(!querySnapshot.empty);
     } catch (err) {
@@ -130,72 +157,95 @@ export default function JobDetails() {
     const fetchJob = async () => {
       try {
         setLoading(true);
+        setError(null);
+
+        if (!jobId) {
+          throw new Error("Job ID is required");
+        }
+
         const jobDoc = await getDoc(doc(db, "jobs", jobId));
-        
+
         if (!jobDoc.exists()) {
           throw new Error("Job not found");
         }
 
         const jobData = jobDoc.data();
-        
-        // Ensure all required fields have values to prevent rendering errors
+
+        // Enhanced data validation and formatting
         const formattedJob = {
           ...jobData,
           id: jobDoc.id,
-          title: jobData.title || 'Untitled Job',
-          company: jobData.company || 'Unknown Company',
-          companyLogo: jobData.companyLogo || "/placeholder.svg?height=40&width=40",
-          description: jobData.description || '',
-          location: typeof jobData.location === 'object' 
-            ? jobData.location.display || jobData.location.address || 'Remote'
-            : jobData.location || 'Remote',
-          type: jobData.type || 'Not specified',
-          category: jobData.category || 'Not specified',
-          hours: jobData.hours || 'Not specified',
-          rate: jobData.salaryAmount 
+          title: jobData.title?.trim() || "Untitled Job",
+          company: jobData.company?.trim() || "Unknown Company",
+          companyLogo:
+            jobData.companyLogo || "/placeholder.svg?height=40&width=40",
+          description: jobData.description?.trim() || "",
+          location:
+            typeof jobData.location === "object"
+              ? jobData.location.display?.trim() ||
+                jobData.location.address?.trim() ||
+                "Remote"
+              : jobData.location?.trim() || "Remote",
+          type: jobData.type?.trim() || "Not specified",
+          category: jobData.category?.trim() || "Not specified",
+          hours: jobData.hours?.trim() || "Not specified",
+          rate: jobData.salaryAmount
             ? `₹${jobData.salaryAmount}/${jobData.salaryType}`
-            : (jobData.rate || 'Not specified'),
-          duration: jobData.duration || 'Not specified',
-          postedDate: jobData.createdAt 
-            ? new Date(jobData.createdAt.seconds * 1000).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-              })
-            : 'Recently',
-          expiryDate: jobData.expiryDate 
-            ? new Date(jobData.expiryDate.seconds * 1000).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-              })
+            : jobData.rate?.trim() || "Not specified",
+          duration: jobData.duration?.trim() || "Not specified",
+          postedDate: jobData.createdAt
+            ? new Date(jobData.createdAt.seconds * 1000).toLocaleDateString(
+                "en-US",
+                {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                }
+              )
+            : "Recently",
+          expiryDate: jobData.expiryDate
+            ? new Date(jobData.expiryDate.seconds * 1000).toLocaleDateString(
+                "en-US",
+                {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                }
+              )
             : undefined,
-          urgent: jobData.urgent || false,
-          featured: jobData.featured || false,
-          responsibilities: jobData.responsibilities || [],
-          requirements: jobData.requirements || [],
-          benefits: jobData.benefits || [],
-          applicationInstructions: jobData.applicationInstructions || '',
-          skills: jobData.skills || [],
-          positionsNeeded: jobData.positionsNeeded || 1,
-          positionsFilled: jobData.positionsFilled || 0,
-          gender: jobData.gender || undefined,
-          minAge: jobData.minAge || undefined,
-          maxAge: jobData.maxAge || undefined,
-          payType: jobData.payType || undefined,
-          companyDescription: jobData.companyDescription || '',
-          contactPerson: jobData.contactPerson || '',
-          applicationMethod: jobData.applicationMethod || '',
-          workLocation: jobData.workLocation || 'Remote',
-          status: jobData.status || 'Active',
-          audioDescription: jobData.audioDescription || null
+          urgent: Boolean(jobData.urgent),
+          featured: Boolean(jobData.featured),
+          responsibilities: Array.isArray(jobData.responsibilities)
+            ? jobData.responsibilities
+            : [],
+          requirements: Array.isArray(jobData.requirements)
+            ? jobData.requirements
+            : [],
+          benefits: Array.isArray(jobData.benefits) ? jobData.benefits : [],
+          applicationInstructions:
+            jobData.applicationInstructions?.trim() || "",
+          skills: Array.isArray(jobData.skills) ? jobData.skills : [],
+          positionsNeeded: Number(jobData.positionsNeeded) || 1,
+          positionsFilled: Number(jobData.positionsFilled) || 0,
+          gender: jobData.gender?.trim() || undefined,
+          minAge: Number(jobData.minAge) || undefined,
+          maxAge: Number(jobData.maxAge) || undefined,
+          payType: jobData.payType?.trim() || undefined,
+          companyDescription: jobData.companyDescription?.trim() || "",
+          contactPerson: jobData.contactPerson?.trim() || "",
+          applicationMethod: jobData.applicationMethod?.trim() || "",
+          workLocation: jobData.workLocation?.trim() || "Remote",
+          status: jobData.status?.trim() || "Active",
+          audioDescription: jobData.audioDescription || null,
         };
-        
+
         setJob(formattedJob);
       } catch (err) {
         console.error("Error fetching job:", err);
-        setError(err instanceof Error ? err.message : "Failed to load job");
-        toast.error("Failed to load job");
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to load job";
+        setError(errorMessage);
+        toast.error(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -208,70 +258,72 @@ export default function JobDetails() {
   const getLocationDisplay = () => {
     if (!job.location) return "Remote";
     if (typeof job.location === "string") return job.location;
-    
+
     // If location is an object
     if (typeof job.location === "object") {
       // Check for display property first
       if (job.location.display) return job.location.display;
-      
+
       // Check for city and state combination
       if (job.location.city && job.location.state) {
         return `${job.location.city}, ${job.location.state}`;
       }
-      
+
       // Check for address
       if (job.location.address) return job.location.address;
-      
+
       // Check for individual properties
       if (job.location.city) return job.location.city;
       if (job.location.state) return job.location.state;
     }
-    
+
     return "Location not specified";
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setApplicationForm(prev => ({
+    setApplicationForm((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleCheckboxChange = (checked: boolean) => {
-    setApplicationForm(prev => ({
+    setApplicationForm((prev) => ({
       ...prev,
-      termsAccepted: checked
+      termsAccepted: checked,
     }));
   };
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Prevent reapplying if already applied
     if (hasApplied) {
       toast.info("You have already applied to this job");
       return;
     }
-    
+
     if (!applicationForm.name.trim()) {
       toast.error("Please enter your name");
       return;
     }
-    
+
     if (!applicationForm.phone.trim()) {
       toast.error("Please enter your phone number");
       return;
     }
-    
+
     if (!applicationForm.termsAccepted) {
       toast.error("Please accept the terms");
       return;
     }
-    
+
     try {
       setIsApplying(true);
-      
+
       // Create application in Firestore
       const applicationData: any = {
         jobId,
@@ -283,33 +335,32 @@ export default function JobDetails() {
         company: job.company,
         status: "Applied",
         isManual: !currentUser, // Set to true for guest applications
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       };
-      
+
       // Add user ID if authenticated
       if (currentUser) {
         applicationData.userId = currentUser.uid;
         applicationData.isManual = false;
       }
-      
+
       await addDoc(collection(db, "applications"), applicationData);
-      
+
       // Update application status
       setHasApplied(true);
-      
+
       // Show success message
       setIsSubmitted(true);
       toast.success("Application submitted successfully!");
-      
+
       // Reset form after successful submission
       setApplicationForm({
         name: "",
         email: "",
         phone: "",
         coverLetter: "",
-        termsAccepted: false
+        termsAccepted: false,
       });
-      
     } catch (err) {
       console.error("Error submitting application:", err);
       toast.error("Failed to submit application. Please try again.");
@@ -324,7 +375,7 @@ export default function JobDetails() {
       toast.error("You must be logged in to remove an application");
       return;
     }
-    
+
     try {
       // Find the application document
       const applicationsRef = collection(db, "applications");
@@ -333,26 +384,28 @@ export default function JobDetails() {
         where("userId", "==", currentUser.uid),
         where("jobId", "==", jobId)
       );
-      
+
       const querySnapshot = await getDocs(q);
-      
+
       if (querySnapshot.empty) {
         toast.error("Application not found");
         return;
       }
-      
+
       // Delete the application document
-      const batch = await import("firebase/firestore").then(module => module.writeBatch(db));
+      const batch = await import("firebase/firestore").then((module) =>
+        module.writeBatch(db)
+      );
       querySnapshot.forEach((doc) => {
         batch.delete(doc.ref);
       });
-      
+
       await batch.commit();
-      
+
       // Update state
       setHasApplied(false);
       setIsSubmitted(false);
-      
+
       toast.success("Application removed successfully");
     } catch (err) {
       console.error("Error removing application:", err);
@@ -367,9 +420,9 @@ export default function JobDetails() {
       router.push("/login");
       return;
     }
-    
+
     setIsSaving(true);
-    
+
     try {
       if (isSaved) {
         // Unsave the job
@@ -379,14 +432,14 @@ export default function JobDetails() {
           where("userId", "==", currentUser.uid),
           where("jobId", "==", jobId)
         );
-        
+
         const querySnapshot = await getDocs(q);
         const batch = writeBatch(db);
-        
+
         querySnapshot.forEach((document) => {
           batch.delete(doc(db, "savedJobs", document.id));
         });
-        
+
         await batch.commit();
         setIsSaved(false);
         toast.success("Job removed from saved jobs");
@@ -404,9 +457,9 @@ export default function JobDetails() {
             type: job.type,
             postedDate: job.postedDate,
           },
-          savedAt: serverTimestamp()
+          savedAt: serverTimestamp(),
         });
-        
+
         setIsSaved(true);
         toast.success("Job saved successfully");
       }
@@ -423,9 +476,12 @@ export default function JobDetails() {
       <MainLayout activeLink="jobs">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <div className="text-center space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
               <p className="text-muted-foreground">Loading job details...</p>
+              <p className="text-sm text-muted-foreground">
+                Please wait while we fetch the job information
+              </p>
             </div>
           </div>
         </div>
@@ -438,10 +494,17 @@ export default function JobDetails() {
       <MainLayout activeLink="jobs">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-            <div className="text-center">
-              <p className="text-destructive mb-4">{error || "Failed to load job"}</p>
+            <div className="text-center space-y-4">
+              <p className="text-destructive text-lg font-medium">
+                {error || "Failed to load job"}
+              </p>
+              <p className="text-muted-foreground">
+                We couldn't load the job details. Please try again later.
+              </p>
               <Button asChild>
-                <Link href="/">Back to Jobs</Link>
+                <Link href="/jobs" className="mt-4">
+                  Back to Jobs
+                </Link>
               </Button>
             </div>
           </div>
@@ -454,13 +517,18 @@ export default function JobDetails() {
     <MainLayout activeLink="jobs">
       <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="mr-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+            className="mr-2"
+          >
             <ArrowLeft className="mr-1 h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>
-          
+
           <div className="flex-1" />
-          
+
           <Button
             variant="ghost"
             size="sm"
@@ -480,13 +548,13 @@ export default function JobDetails() {
               </>
             )}
           </Button>
-          
+
           <Button variant="ghost" size="sm" className="flex items-center gap-1">
             <Share2 className="h-4 w-4" />
             <span className="hidden sm:inline">Share</span>
           </Button>
         </div>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
@@ -576,7 +644,7 @@ export default function JobDetails() {
                 </div>
 
                 {job.description && <p>{job.description}</p>}
-                
+
                 {/* Voice Description Section */}
                 {job.audioDescription && (
                   <div className="my-6 space-y-2">
@@ -585,7 +653,9 @@ export default function JobDetails() {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <Mic className="h-4 w-4 text-primary" />
-                          <span className="text-sm font-medium">Audio Description</span>
+                          <span className="text-sm font-medium">
+                            Audio Description
+                          </span>
                         </div>
                         {job.audioDescription.url && (
                           <a
@@ -598,15 +668,18 @@ export default function JobDetails() {
                         )}
                       </div>
                       <div className="flex items-center gap-4">
-                        <audio 
-                          controls 
+                        <audio
+                          controls
                           className="w-full h-10 [&::-webkit-media-controls-panel]:bg-muted/50"
                           onError={(e) => {
                             console.error("Audio error:", e);
                             toast.error("Failed to load audio description");
                           }}
                         >
-                          <source src={job.audioDescription.url} type="audio/webm" />
+                          <source
+                            src={job.audioDescription.url}
+                            type="audio/webm"
+                          />
                           Your browser does not support the audio element.
                         </audio>
                       </div>
@@ -618,34 +691,85 @@ export default function JobDetails() {
                     </div>
                   </div>
                 )}
-                
+
                 {/* Job Details */}
                 <div className="my-4 space-y-2">
                   <h3>Job Details</h3>
                   <ul>
-                    {job.type && <li><strong>Job Type:</strong> {job.type}</li>}
-                    {job.category && <li><strong>Category:</strong> {job.category}</li>}
-                    {job.hours && <li><strong>Working Hours:</strong> {job.hours}</li>}
-                    {job.duration && <li><strong>Duration:</strong> {job.duration}</li>}
-                    {job.rate && <li><strong>Pay Rate:</strong> {job.rate}</li>}
-                    {job.payType && <li><strong>Payment Type:</strong> {job.payType}</li>}
-                    {job.positionsNeeded && <li><strong>Positions:</strong> {job.positionsNeeded}</li>}
-                    {job.positionsFilled !== undefined && job.positionsNeeded && 
-                      <li><strong>Positions Filled:</strong> {job.positionsFilled} of {job.positionsNeeded}</li>}
-                    {job.minAge && <li><strong>Minimum Age:</strong> {job.minAge} years</li>}
-                    {job.maxAge && <li><strong>Maximum Age:</strong> {job.maxAge} years</li>}
-                    {job.gender && <li><strong>Preferred Gender:</strong> {job.gender}</li>}
-                    {job.workLocation && <li><strong>Work Location Type:</strong> {job.workLocation}</li>}
+                    {job.type && (
+                      <li>
+                        <strong>Job Type:</strong> {job.type}
+                      </li>
+                    )}
+                    {job.category && (
+                      <li>
+                        <strong>Category:</strong> {job.category}
+                      </li>
+                    )}
+                    {job.hours && (
+                      <li>
+                        <strong>Working Hours:</strong> {job.hours}
+                      </li>
+                    )}
+                    {job.duration && (
+                      <li>
+                        <strong>Duration:</strong> {job.duration}
+                      </li>
+                    )}
+                    {job.rate && (
+                      <li>
+                        <strong>Pay Rate:</strong> {job.rate}
+                      </li>
+                    )}
+                    {job.payType && (
+                      <li>
+                        <strong>Payment Type:</strong> {job.payType}
+                      </li>
+                    )}
+                    {job.positionsNeeded && (
+                      <li>
+                        <strong>Positions:</strong> {job.positionsNeeded}
+                      </li>
+                    )}
+                    {job.positionsFilled !== undefined &&
+                      job.positionsNeeded && (
+                        <li>
+                          <strong>Positions Filled:</strong>{" "}
+                          {job.positionsFilled} of {job.positionsNeeded}
+                        </li>
+                      )}
+                    {job.minAge && (
+                      <li>
+                        <strong>Minimum Age:</strong> {job.minAge} years
+                      </li>
+                    )}
+                    {job.maxAge && (
+                      <li>
+                        <strong>Maximum Age:</strong> {job.maxAge} years
+                      </li>
+                    )}
+                    {job.gender && (
+                      <li>
+                        <strong>Preferred Gender:</strong> {job.gender}
+                      </li>
+                    )}
+                    {job.workLocation && (
+                      <li>
+                        <strong>Work Location Type:</strong> {job.workLocation}
+                      </li>
+                    )}
                   </ul>
                 </div>
-                
+
                 {job.responsibilities && job.responsibilities.length > 0 && (
                   <>
                     <h3>Responsibilities:</h3>
                     <ul>
-                      {job.responsibilities.map((item: string, index: number) => (
-                        <li key={index}>{item}</li>
-                      ))}
+                      {job.responsibilities.map(
+                        (item: string, index: number) => (
+                          <li key={index}>{item}</li>
+                        )
+                      )}
                     </ul>
                   </>
                 )}
@@ -673,20 +797,27 @@ export default function JobDetails() {
                   <>
                     <h3>Skills Required:</h3>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {typeof job.skills === 'string' 
-                        ? job.skills.split(',').map((skill: string, index: number) => (
-                            <span key={index} className="bg-secondary px-2 py-1 rounded-full text-xs">
-                              {skill.trim()}
-                            </span>
-                          ))
-                        : Array.isArray(job.skills) 
-                          ? job.skills.map((skill: string, index: number) => (
-                              <span key={index} className="bg-secondary px-2 py-1 rounded-full text-xs">
+                      {typeof job.skills === "string"
+                        ? job.skills
+                            .split(",")
+                            .map((skill: string, index: number) => (
+                              <span
+                                key={index}
+                                className="bg-secondary px-2 py-1 rounded-full text-xs"
+                              >
                                 {skill.trim()}
                               </span>
                             ))
-                          : null
-                      }
+                        : Array.isArray(job.skills)
+                        ? job.skills.map((skill: string, index: number) => (
+                            <span
+                              key={index}
+                              className="bg-secondary px-2 py-1 rounded-full text-xs"
+                            >
+                              {skill.trim()}
+                            </span>
+                          ))
+                        : null}
                     </div>
                   </>
                 )}
@@ -699,7 +830,9 @@ export default function JobDetails() {
                   <CardTitle>About {job.company}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">{job.companyDescription}</p>
+                  <p className="text-muted-foreground">
+                    {job.companyDescription}
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -716,35 +849,43 @@ export default function JobDetails() {
               <CardContent className="space-y-4">
                 {job.applicationMethod && (
                   <p className="text-sm">
-                    <span className="font-medium">Application Method:</span> {job.applicationMethod}
+                    <span className="font-medium">Application Method:</span>{" "}
+                    {job.applicationMethod}
                   </p>
                 )}
                 {job.contactPerson && (
                   <p className="text-sm">
-                    <span className="font-medium">Contact Person:</span> {job.contactPerson}
+                    <span className="font-medium">Contact Person:</span>{" "}
+                    {job.contactPerson}
                   </p>
                 )}
                 {job.applicationInstructions && (
                   <>
                     <Separator />
-                    <p className="text-sm text-muted-foreground">{job.applicationInstructions}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {job.applicationInstructions}
+                    </p>
                   </>
                 )}
-                
+
                 {/* Position details */}
                 <div className="bg-muted/50 p-3 rounded-lg">
                   <p className="text-sm font-medium mb-2">Position Details</p>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {job.positionsNeeded && (
                       <div>
-                        <p className="text-muted-foreground text-xs">Positions</p>
+                        <p className="text-muted-foreground text-xs">
+                          Positions
+                        </p>
                         <p>{job.positionsNeeded}</p>
                       </div>
                     )}
                     {job.positionsFilled !== undefined && (
                       <div>
                         <p className="text-muted-foreground text-xs">Filled</p>
-                        <p>{job.positionsFilled} of {job.positionsNeeded}</p>
+                        <p>
+                          {job.positionsFilled} of {job.positionsNeeded}
+                        </p>
                       </div>
                     )}
                     {job.status && (
@@ -766,17 +907,19 @@ export default function JobDetails() {
                 <div className="w-full flex gap-2">
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button 
-                        className={hasApplied ? "flex-1" : "w-full"} 
+                      <Button
+                        className={hasApplied ? "flex-1" : "w-full"}
                         variant={hasApplied ? "outline" : "default"}
-                        disabled={job.status !== "Active" || (hasApplied && !isSubmitted)}
-                      >
-                        {hasApplied 
-                          ? "Already Applied" 
-                          : job.status !== "Active"
-                            ? "Applications Closed"
-                            : "Apply Now"
+                        disabled={
+                          job.status !== "Active" ||
+                          (hasApplied && !isSubmitted)
                         }
+                      >
+                        {hasApplied
+                          ? "Already Applied"
+                          : job.status !== "Active"
+                          ? "Applications Closed"
+                          : "Apply Now"}
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[425px]">
@@ -785,14 +928,19 @@ export default function JobDetails() {
                           <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                             <CheckCircle className="h-6 w-6 text-primary" />
                           </div>
-                          <DialogTitle className="text-xl mb-2">Application Submitted!</DialogTitle>
+                          <DialogTitle className="text-xl mb-2">
+                            Application Submitted!
+                          </DialogTitle>
                           <DialogDescription>
-                            Your application for {job.title} at {job.company} has been sent successfully.
-                            <br /><br />
-                            The employer will contact you if they are interested in your application.
+                            Your application for {job.title} at {job.company}{" "}
+                            has been sent successfully.
+                            <br />
+                            <br />
+                            The employer will contact you if they are interested
+                            in your application.
                           </DialogDescription>
                           <div className="mt-6 flex flex-col space-y-2">
-                            <Button 
+                            <Button
                               onClick={() => {
                                 setIsSubmitted(false);
                                 router.push("/");
@@ -810,18 +958,23 @@ export default function JobDetails() {
                           <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                             <CheckCircle className="h-6 w-6 text-primary" />
                           </div>
-                          <DialogTitle className="text-xl mb-2">Already Applied!</DialogTitle>
+                          <DialogTitle className="text-xl mb-2">
+                            Already Applied!
+                          </DialogTitle>
                           <DialogDescription>
-                            You have already applied for {job.title} at {job.company}.
-                            <br /><br />
-                            The employer will contact you if they are interested in your application.
+                            You have already applied for {job.title} at{" "}
+                            {job.company}.
+                            <br />
+                            <br />
+                            The employer will contact you if they are interested
+                            in your application.
                           </DialogDescription>
                           <div className="mt-6 flex flex-col space-y-2">
                             <DialogClose asChild>
                               <Button variant="outline">Close</Button>
                             </DialogClose>
-                            <Button 
-                              variant="destructive" 
+                            <Button
+                              variant="destructive"
                               onClick={() => setIsRemoveDialogOpen(true)}
                             >
                               Remove Application
@@ -833,12 +986,17 @@ export default function JobDetails() {
                           <DialogHeader>
                             <DialogTitle>Apply for {job.title}</DialogTitle>
                             <DialogDescription>
-                              Fill out the form below to apply for this position at {job.company}.
+                              Fill out the form below to apply for this position
+                              at {job.company}.
                               {!currentUser && (
                                 <div className="mt-2">
-                                  <Link href={`/login?redirect=/jobs/${jobId}`} className="text-primary hover:underline">
+                                  <Link
+                                    href={`/login?redirect=/jobs/${jobId}`}
+                                    className="text-primary hover:underline"
+                                  >
                                     Sign in
-                                  </Link> to automatically fill your details.
+                                  </Link>{" "}
+                                  to automatically fill your details.
                                 </div>
                               )}
                             </DialogDescription>
@@ -856,7 +1014,9 @@ export default function JobDetails() {
                                 />
                               </div>
                               <div className="grid gap-2">
-                                <Label htmlFor="email">Email {currentUser ? "" : "(Optional)"}</Label>
+                                <Label htmlFor="email">
+                                  Email {currentUser ? "" : "(Optional)"}
+                                </Label>
                                 <Input
                                   id="email"
                                   name="email"
@@ -878,7 +1038,9 @@ export default function JobDetails() {
                                 />
                               </div>
                               <div className="grid gap-2">
-                                <Label htmlFor="coverLetter">Why are you interested in this job? (Optional)</Label>
+                                <Label htmlFor="coverLetter">
+                                  Why are you interested in this job? (Optional)
+                                </Label>
                                 <Textarea
                                   id="coverLetter"
                                   name="coverLetter"
@@ -888,20 +1050,23 @@ export default function JobDetails() {
                                 />
                               </div>
                               <div className="flex items-center space-x-2">
-                                <Checkbox 
-                                  id="terms" 
+                                <Checkbox
+                                  id="terms"
                                   checked={applicationForm.termsAccepted}
                                   onCheckedChange={handleCheckboxChange}
                                   required
                                 />
                                 <Label htmlFor="terms" className="text-sm">
-                                  I agree to be contacted about this job opportunity
+                                  I agree to be contacted about this job
+                                  opportunity
                                 </Label>
                               </div>
                             </div>
                             <DialogFooter>
                               <Button type="submit" disabled={isApplying}>
-                                {isApplying ? "Submitting..." : "Submit Application"}
+                                {isApplying
+                                  ? "Submitting..."
+                                  : "Submit Application"}
                               </Button>
                             </DialogFooter>
                           </form>
@@ -909,11 +1074,11 @@ export default function JobDetails() {
                       )}
                     </DialogContent>
                   </Dialog>
-                  
+
                   {hasApplied && currentUser && (
                     <>
-                      <Button 
-                        variant="destructive" 
+                      <Button
+                        variant="destructive"
                         className="flex-1"
                         onClick={() => setIsRemoveDialogOpen(true)}
                       >
@@ -921,21 +1086,28 @@ export default function JobDetails() {
                       </Button>
 
                       {/* Confirmation Dialog */}
-                      <Dialog open={isRemoveDialogOpen} onOpenChange={setIsRemoveDialogOpen}>
+                      <Dialog
+                        open={isRemoveDialogOpen}
+                        onOpenChange={setIsRemoveDialogOpen}
+                      >
                         <DialogContent>
                           <DialogHeader>
                             <DialogTitle>Confirm Removal</DialogTitle>
                             <DialogDescription>
-                              Are you sure you want to remove your application for {job.title} at {job.company}?
-                              This action cannot be undone.
+                              Are you sure you want to remove your application
+                              for {job.title} at {job.company}? This action
+                              cannot be undone.
                             </DialogDescription>
                           </DialogHeader>
                           <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsRemoveDialogOpen(false)}>
+                            <Button
+                              variant="outline"
+                              onClick={() => setIsRemoveDialogOpen(false)}
+                            >
                               Cancel
                             </Button>
-                            <Button 
-                              variant="destructive" 
+                            <Button
+                              variant="destructive"
                               onClick={() => {
                                 handleRemoveApplication();
                                 setIsRemoveDialogOpen(false);
@@ -957,4 +1129,3 @@ export default function JobDetails() {
     </MainLayout>
   );
 }
-

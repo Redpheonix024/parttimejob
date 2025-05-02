@@ -1,10 +1,17 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
+import type React from "react";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import {
   BarChart3,
   Briefcase,
@@ -16,9 +23,9 @@ import {
   Plus,
   PieChart,
   Users,
-} from "lucide-react"
-import { RupeeIcon } from "@/components/ui/rupee-icon"
-import AdminLayout from "@/components/admin/admin-layout"
+} from "lucide-react";
+import { RupeeIcon } from "@/components/ui/rupee-icon";
+import AdminLayout from "@/components/admin/admin-layout";
 
 export default function AdminDashboard() {
   return (
@@ -30,9 +37,11 @@ export default function AdminDashboard() {
             <Download className="mr-2 h-4 w-4" />
             Export Data
           </Button>
-          <Button size="sm">
-            <Plus className="mr-2 h-4 w-4" />
-            New Job
+          <Button size="sm" asChild>
+            <Link href="/post-job">
+              <Plus className="mr-2 h-4 w-4" />
+              New Job
+            </Link>
           </Button>
         </div>
       </div>
@@ -79,26 +88,34 @@ export default function AdminDashboard() {
                 View All
               </Button>
             </div>
-            <CardDescription>Latest actions and updates on the platform</CardDescription>
+            <CardDescription>
+              Latest actions and updates on the platform
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
               {recentActivities.map((activity, index) => (
                 <div key={index} className="flex items-start">
                   <div
-                    className={`h-9 w-9 rounded-full flex items-center justify-center mr-3 ${getActivityColor(activity.type)}`}
+                    className={`h-9 w-9 rounded-full flex items-center justify-center mr-3 ${getActivityColor(
+                      activity.type
+                    )}`}
                   >
                     {getActivityIcon(activity.type)}
                   </div>
                   <div className="flex-1">
                     <p className="font-medium">{activity.title}</p>
-                    <p className="text-sm text-muted-foreground">{activity.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {activity.description}
+                    </p>
                     <div className="flex items-center mt-1 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3 mr-1" />
                       <span>{activity.time}</span>
                     </div>
                   </div>
-                  <Badge variant={getActivityBadgeVariant(activity.type)}>{activity.type}</Badge>
+                  <Badge variant={getActivityBadgeVariant(activity.type)}>
+                    {activity.type}
+                  </Badge>
                 </div>
               ))}
             </div>
@@ -109,7 +126,9 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Platform Overview</CardTitle>
-            <CardDescription>Key metrics and performance indicators</CardDescription>
+            <CardDescription>
+              Key metrics and performance indicators
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="users">
@@ -133,7 +152,10 @@ export default function AdminDashboard() {
                       <span className="font-medium">78%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary" style={{ width: "78%" }}></div>
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: "78%" }}
+                      ></div>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -142,7 +164,10 @@ export default function AdminDashboard() {
                       <span className="font-medium">22%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary" style={{ width: "22%" }}></div>
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: "22%" }}
+                      ></div>
                     </div>
                   </div>
                   <div className="pt-2">
@@ -167,7 +192,10 @@ export default function AdminDashboard() {
                       <span className="font-medium">45%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary" style={{ width: "45%" }}></div>
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: "45%" }}
+                      ></div>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -176,7 +204,10 @@ export default function AdminDashboard() {
                       <span className="font-medium">35%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary" style={{ width: "35%" }}></div>
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: "35%" }}
+                      ></div>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -185,7 +216,10 @@ export default function AdminDashboard() {
                       <span className="font-medium">20%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary" style={{ width: "20%" }}></div>
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: "20%" }}
+                      ></div>
                     </div>
                   </div>
                   <div className="pt-2">
@@ -210,7 +244,10 @@ export default function AdminDashboard() {
                       <span className="font-medium">30%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary" style={{ width: "30%" }}></div>
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: "30%" }}
+                      ></div>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -219,7 +256,10 @@ export default function AdminDashboard() {
                       <span className="font-medium">45%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary" style={{ width: "45%" }}></div>
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: "45%" }}
+                      ></div>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -228,7 +268,10 @@ export default function AdminDashboard() {
                       <span className="font-medium">25%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary" style={{ width: "25%" }}></div>
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: "25%" }}
+                      ></div>
                     </div>
                   </div>
                   <div className="pt-2">
@@ -243,7 +286,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
     </AdminLayout>
-  )
+  );
 }
 
 // Dummy data for recent activities
@@ -272,7 +315,7 @@ const recentActivities = [
     description: "14 new applications for 'Customer Support Executive'.",
     time: "3 hours ago",
   },
-]
+];
 
 function StatCard({
   title,
@@ -281,11 +324,11 @@ function StatCard({
   trend,
   icon,
 }: {
-  title: string
-  value: string
-  change: string
-  trend: "up" | "down"
-  icon: React.ReactNode
+  title: string;
+  value: string;
+  change: string;
+  trend: "up" | "down";
+  icon: React.ReactNode;
 }) {
   return (
     <Card>
@@ -311,51 +354,50 @@ function StatCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function getActivityColor(type: string) {
   switch (type) {
     case "User":
-      return "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300"
+      return "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300";
     case "Job":
-      return "bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300"
+      return "bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300";
     case "Payment":
-      return "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
+      return "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300";
     case "Application":
-      return "bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300"
+      return "bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300";
     default:
-      return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+      return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
   }
 }
 
 function getActivityIcon(type: string) {
   switch (type) {
     case "User":
-      return <Users className="h-5 w-5" />
+      return <Users className="h-5 w-5" />;
     case "Job":
-      return <Briefcase className="h-5 w-5" />
+      return <Briefcase className="h-5 w-5" />;
     case "Payment":
-      return <DollarSign className="h-5 w-5" />
+      return <DollarSign className="h-5 w-5" />;
     case "Application":
-      return <FileText className="h-5 w-5" />
+      return <FileText className="h-5 w-5" />;
     default:
-      return <BarChart3 className="h-5 w-5" />
+      return <BarChart3 className="h-5 w-5" />;
   }
 }
 
 function getActivityBadgeVariant(type: string) {
   switch (type) {
     case "User":
-      return "outline"
+      return "outline";
     case "Job":
-      return "secondary"
+      return "secondary";
     case "Payment":
-      return "default"
+      return "default";
     case "Application":
-      return "destructive"
+      return "destructive";
     default:
-      return "outline"
+      return "outline";
   }
 }
-

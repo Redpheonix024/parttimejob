@@ -28,6 +28,8 @@ import { jobsApi } from "@/utils/api";
 import type { JobStatus } from "@/types/job";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import { onSnapshot, query, collection, where } from "firebase/firestore";
+import { db } from "@/app/config/firebase";
 
 export default function JobStatusPage() {
   const { user, loading: authLoading } = useAuth();
@@ -51,24 +53,39 @@ export default function JobStatusPage() {
     // Don't fetch data until authentication is complete
     if (authLoading || !user) return;
 
-    const fetchJobs = async () => {
-      try {
-        setLoading(true);
-        const data = await jobsApi.getUserJobStatus(user.uid);
-        setJobs(data.jobs);
-        setError(null);
-      } catch (err: any) {
-        console.error("Failed to fetch jobs:", err);
-        setError(
-          err?.message ||
-            "Failed to load your job status. Please try again later."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Set up real-time listener for applications
+    const applicationsQuery = query(
+      collection(db, "applications"),
+      where("userId", "==", user.uid)
+    );
 
-    fetchJobs();
+    const unsubscribe = onSnapshot(
+      applicationsQuery,
+      async (snapshot) => {
+        try {
+          setLoading(true);
+          // Get the latest job status data
+          const data = await jobsApi.getUserJobStatus(user.uid);
+          setJobs(data.jobs);
+          setError(null);
+        } catch (err: any) {
+          console.error("Failed to fetch jobs:", err);
+          setError(
+            err?.message ||
+              "Failed to load your job status. Please try again later."
+          );
+        } finally {
+          setLoading(false);
+        }
+      },
+      (error) => {
+        console.error("Error in real-time listener:", error);
+        setError("Failed to maintain real-time connection");
+      }
+    );
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
   }, [user, authLoading, router]);
 
   const handleViewDetails = (jobId: string) => {

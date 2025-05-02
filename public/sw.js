@@ -1,5 +1,5 @@
 const CACHE_NAME = "parttimejob-cache-v1";
-const urlsToCache = ["/", "/icons/icon-192x192.png", "/icons/icon-512x512.png"];
+const urlsToCache = ["/", "/icons/layer.ico"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
