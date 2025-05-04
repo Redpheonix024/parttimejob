@@ -29,9 +29,11 @@ export default function Header({
   toggleMobileSidebar,
 }: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    setIsMounted(true);
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
     });
@@ -51,11 +53,11 @@ export default function Header({
     <header className="bg-background border-b">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center">
-          {user && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="mr-2 md:hidden" 
+          {isMounted && user && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="mr-2 md:hidden"
               onClick={toggleMobileSidebar}
             >
               <Menu className="h-5 w-5" />
@@ -65,7 +67,7 @@ export default function Header({
             Parttimejob
           </Link>
         </div>
-        
+
         {showNav && (
           <nav className="hidden md:flex items-center gap-6">
             <Link
@@ -102,48 +104,67 @@ export default function Header({
         )}
         <div className="flex items-center gap-4">
           <ThemeToggle />
-          <Link href="/post-job">
-            <Button>Post a Job</Button>
-          </Link>
-          {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Avatar className="h-8 w-8">
-                  <AvatarImage
-                    src={
-                      userData?.profilePicture ||
-                      userData?.photoURL ||
-                      user?.photoURL ||
-                      "/placeholder-user.jpg"
-                    }
-                    alt={userData?.firstName || user?.displayName || "User"}
-                    style={{ objectFit: "cover" }}
-                  />
-                  <AvatarFallback>
-                    {userData?.firstName?.[0]?.toUpperCase() ||
-                      user?.displayName?.[0] ||
-                      ""}
-                  </AvatarFallback>
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard">Dashboard</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/profile">Profile</Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Link href="/login">
-              <Button variant="outline" size="sm" className="whitespace-nowrap">Sign In</Button>
-            </Link>
-          )}
+
+          <div className="flex items-center gap-4">
+            {isMounted ? (
+              <>
+                {user ? (
+                  <>
+                    {/* <Link href="/post-job">
+                      <Button>Post a Job</Button>
+                    </Link> */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger>
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage
+                            src={
+                              userData?.profilePicture ||
+                              userData?.photoURL ||
+                              user?.photoURL ||
+                              "/placeholder-user.jpg"
+                            }
+                            alt={
+                              userData?.firstName || user?.displayName || "User"
+                            }
+                            style={{ objectFit: "cover" }}
+                          />
+                          <AvatarFallback>
+                            {userData?.firstName?.[0]?.toUpperCase() ||
+                              user?.displayName?.[0] ||
+                              ""}
+                          </AvatarFallback>
+                        </Avatar>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href="/dashboard">Dashboard</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href="/dashboard/profile">Profile</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout}>
+                          Log out
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                ) : (
+                  <Link href="/login">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="whitespace-nowrap"
+                    >
+                      Sign In
+                    </Button>
+                  </Link>
+                )}
+              </>
+            ) : (
+              <div className="w-[72px] h-[32px]" />
+            )}
+          </div>
         </div>
       </div>
     </header>

@@ -73,7 +73,7 @@ export default function MainSidebar({
                 isActive={activeLink === "jobs"}
                 onClick={() => setIsOpen(false)}
               />
-              <NavItem
+              {/* <NavItem
                 href="/search"
                 icon={<Search className="h-5 w-5" />}
                 label="Search Jobs"
@@ -86,7 +86,7 @@ export default function MainSidebar({
                 label="Post a Job"
                 isActive={activeLink === "post-job"}
                 onClick={() => setIsOpen(false)}
-              />
+              /> */}
               <NavItem
                 href="/how-it-works"
                 icon={<BookOpen className="h-5 w-5" />}

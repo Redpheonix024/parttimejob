@@ -1,7 +1,7 @@
 // "use client";
 
 import type React from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -9,19 +9,20 @@ import AuthProvider from "../components/auth/auth-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#000000",
+};
+
 export const metadata: Metadata = {
   title: "Parttimejob - Find Part-Time Jobs",
   description:
     "Connect with local part-time opportunities or find qualified people for your short-term tasks.",
   generator: "v0.dev",
   manifest: "/manifest.json",
-  themeColor: "#000000",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
