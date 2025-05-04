@@ -104,12 +104,14 @@ export default function DashboardSidebar({
   }, [isOpen, toggleSidebar, isMobile]);
 
   const handleDashboardSwitch = (type: "employee" | "employer") => {
-    setDashboardType(type);
-    if (type === "employee") {
-      router.push("/dashboard");
-    } else {
-      router.push("/dashboard/employer");
+    if (type === "employer") {
+      // Show alert and prevent switching
+      alert("Employer dashboard is temporarily disabled.");
+      return;
     }
+    // Proceed with switching to employee dashboard
+    setDashboardType(type);
+    router.push("/dashboard");
   };
 
   const handleLogout = async () => {
