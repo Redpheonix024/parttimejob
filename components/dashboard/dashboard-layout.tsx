@@ -1,67 +1,72 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import DashboardSidebar from "@/components/dashboard/dashboard-sidebar"
-import DashboardHeader from "@/components/dashboard/dashboard-header"
-import MobileTabs from "@/components/dashboard/mobile-tabs"
+import type React from "react";
+import { useState, useEffect } from "react";
+import DashboardSidebar from "@/components/dashboard/dashboard-sidebar";
+import DashboardHeader from "@/components/dashboard/dashboard-header";
+import MobileTabs from "@/components/dashboard/mobile-tabs";
 
 interface DashboardLayoutProps {
-  children: React.ReactNode
-  activeRoute: string
-  userData?: any
-  user?: any
+  children: React.ReactNode;
+  activeRoute: string;
+  userData?: any;
+  user?: any;
 }
 
-export default function DashboardLayout({ 
-  children, 
+// Define toggle function type if not already defined globally
+type ToggleSidebarFunc = () => void;
+
+export default function DashboardLayout({
+  children,
   activeRoute,
-  userData, 
+  userData,
   user,
 }: DashboardLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState(activeRoute)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(activeRoute);
   const [refreshKey, setRefreshKey] = useState(Date.now());
-  
+
   // Force a refresh of the header when profile picture changes
   useEffect(() => {
     setRefreshKey(Date.now());
   }, [userData?.profilePicture, userData?.photoURL]);
 
   const handleTabChange = (value: string) => {
-    setActiveTab(value)
+    setActiveTab(value);
     // In a real app, you would use router.push here
-    window.location.href = value === "overview" ? "/dashboard" : `/dashboard/${value}`
-  }
+    window.location.href =
+      value === "overview" ? "/dashboard" : `/dashboard/${value}`;
+  };
 
   const toggleSidebar = () => {
     // For mobile, toggle the mobile sidebar
     if (window.innerWidth < 768) {
-      setMobileSidebarOpen(!mobileSidebarOpen)
+      setMobileSidebarOpen(!mobileSidebarOpen);
     } else {
       // For desktop, toggle the regular sidebar
-      setSidebarOpen(!sidebarOpen)
+      setSidebarOpen(!sidebarOpen);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
-      <DashboardSidebar 
-        activeRoute={activeRoute} 
-        isOpen={sidebarOpen} 
+      <DashboardSidebar
+        activeRoute={activeRoute}
+        isOpen={sidebarOpen}
         mobileOpen={mobileSidebarOpen}
         setMobileOpen={setMobileSidebarOpen}
         userData={userData}
         user={user}
+        toggleSidebar={toggleSidebar}
       />
 
       <div className="flex-1 min-w-0 overflow-auto">
-        <DashboardHeader 
+        <DashboardHeader
           key={refreshKey}
-          toggleSidebar={toggleSidebar} 
-          userData={userData} 
-          user={user} 
+          toggleSidebar={toggleSidebar}
+          userData={userData}
+          user={user}
         />
 
         <main className="container mx-auto px-4 py-8">
@@ -70,6 +75,5 @@ export default function DashboardLayout({
         </main>
       </div>
     </div>
-  )
+  );
 }
-

@@ -15,28 +15,28 @@ interface AdminHeaderProps {
 
 export default function AdminHeader({
   toggleSidebar,
-  title = "Admin Dashboard",
+  title = "Admin control Centre",
 }: AdminHeaderProps) {
   const [user, setUser] = useState<User | null>(null);
-  
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
       setUser(currentUser);
     });
-    
+
     return () => unsubscribe();
   }, []);
-  
+
   return (
     <header className="bg-background border-b sticky top-0 z-10">
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <div className="flex items-center md:hidden">
-          <Button variant="ghost" size="icon" onClick={toggleSidebar}>
-            <Menu className="h-5 w-5" />
-          </Button>
-        </div>
-        <div className="flex-1 max-w-md hidden md:block">
-          <h1 className="text-xl font-bold">{title}</h1>
+      <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <div className="md:hidden">
+            <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+              <Menu className="h-5 w-5" />
+            </Button>
+          </div>
+          <h1 className="text-xl font-semibold">Admin control Centre</h1>
         </div>
         <div className="flex items-center gap-4">
           <ThemeToggle />
@@ -51,14 +51,17 @@ export default function AdminHeader({
                 alt="Admin"
               />
               <AvatarFallback>
-                {user?.displayName ? 
-                  `${user.displayName.split(' ')[0][0]}${user.displayName.split(' ')[1]?.[0] || ''}` : 
-                  'AD'
-                }
+                {user?.displayName
+                  ? `${user.displayName.split(" ")[0][0]}${
+                      user.displayName.split(" ")[1]?.[0] || ""
+                    }`
+                  : "AD"}
               </AvatarFallback>
             </Avatar>
             <div className="hidden md:block">
-              <p className="text-sm font-medium">{user?.displayName || "Admin User"}</p>
+              <p className="text-sm font-medium">
+                {user?.displayName || "Admin User"}
+              </p>
               <p className="text-xs text-muted-foreground">
                 {user?.email || "admin@Parttimejob.com"}
               </p>

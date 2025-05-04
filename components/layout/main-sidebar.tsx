@@ -4,15 +4,15 @@ import type React from "react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { 
-  Home, 
-  Search, 
-  Info, 
-  BookOpen, 
-  LogOut, 
-  User, 
+import {
+  Home,
+  Search,
+  Info,
+  BookOpen,
+  LogOut,
+  User,
   Briefcase,
-  LayoutDashboard
+  LayoutDashboard,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getAuth, signOut } from "firebase/auth";
@@ -30,7 +30,7 @@ export default function MainSidebar({
   isOpen,
   setIsOpen,
   userData,
-  user
+  user,
 }: MainSidebarProps) {
   const router = useRouter();
 
@@ -63,7 +63,7 @@ export default function MainSidebar({
               Parttimejob
             </Link>
           </div>
-          
+
           <div className="flex-1 overflow-auto py-4">
             <nav className="space-y-1 px-2">
               <NavItem
@@ -132,21 +132,30 @@ export default function MainSidebar({
               </nav>
             </div>
           </div>
-          
+
           <div className="p-4 border-t">
             <div className="flex items-center">
               <Avatar className="h-8 w-8">
-                <AvatarImage 
-                  src={userData?.profilePicture || userData?.photoURL || user?.photoURL || "/placeholder-user.jpg"} 
-                  alt={userData?.firstName || user?.displayName || "User"} 
+                <AvatarImage
+                  src={
+                    userData?.profilePicture ||
+                    userData?.photoURL ||
+                    user?.photoURL ||
+                    "/placeholder-user.jpg"
+                  }
+                  alt={userData?.firstName || user?.displayName || "User"}
                   style={{ objectFit: "cover" }}
                 />
                 <AvatarFallback>
-                  {userData?.firstName?.[0]?.toUpperCase() || user?.displayName?.[0] || "U"}
+                  {userData?.firstName?.[0]?.toUpperCase() ||
+                    user?.displayName?.[0] ||
+                    "U"}
                 </AvatarFallback>
               </Avatar>
               <div className="ml-3">
-                <p className="text-sm font-medium">{userData?.firstName || user?.displayName || "User"}</p>
+                <p className="text-sm font-medium">
+                  {userData?.firstName || user?.displayName || "User"}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {userData?.email || user?.email || ""}
                 </p>
@@ -167,13 +176,7 @@ interface NavItemProps {
   onClick?: () => void;
 }
 
-function NavItem({
-  href,
-  icon,
-  label,
-  isActive,
-  onClick,
-}: NavItemProps) {
+function NavItem({ href, icon, label, isActive, onClick }: NavItemProps) {
   const className = `flex items-center px-3 py-2 text-sm rounded-md ${
     isActive
       ? "bg-primary/10 text-primary font-medium"
@@ -195,4 +198,4 @@ function NavItem({
       <span>{label}</span>
     </Link>
   );
-} 
+}

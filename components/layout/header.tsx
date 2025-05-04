@@ -57,7 +57,7 @@ export default function Header({
             <Button
               variant="ghost"
               size="icon"
-              className="mr-2 md:hidden"
+              className="mr-2"
               onClick={toggleMobileSidebar}
             >
               <Menu className="h-5 w-5" />

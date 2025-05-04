@@ -16,6 +16,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  distDir: '.next',
+  poweredByHeader: false,
+  generateEtags: true,
+  compress: true,
   experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,

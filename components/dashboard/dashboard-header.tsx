@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Bell, Menu, MessageSquare, LogOut, User, Settings } from "lucide-react";
+import { Bell, LogOut, Menu, MessageSquare, Settings, User } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   DropdownMenu,
@@ -46,21 +46,19 @@ export default function DashboardHeader({
             <Menu className="h-5 w-5" />
           </Button>
         </div>
-        <div className="md:hidden">
-          <Link href="/" className="text-2xl font-bold text-primary">
-            Parttimejob
-          </Link>
-        </div>
+        <h1 className="text-2xl font-bold text-primary">
+          Parttimejob-User dashboard
+        </h1>
         <div className="flex items-center ml-auto">
           <ThemeToggle />
-          <Button variant="ghost" size="icon" className="mr-2 relative">
+          {/* <Button variant="ghost" size="icon" className="mr-2 relative">
             <Bell className="h-5 w-5" />
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary"></span>
           </Button>
           <Button variant="ghost" size="icon" className="mr-2 relative">
             <MessageSquare className="h-5 w-5" />
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary"></span>
-          </Button>
+          </Button> */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Avatar className="h-8 w-8 cursor-pointer">
@@ -111,3 +109,5 @@ export default function DashboardHeader({
     </header>
   );
 }
+
+

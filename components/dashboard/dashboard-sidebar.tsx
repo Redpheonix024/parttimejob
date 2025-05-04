@@ -15,10 +15,12 @@ import {
   ClipboardCheck,
   Building2,
   Briefcase,
+  PanelLeft,
+  PanelRight,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { getAuth, signOut } from "firebase/auth";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface DashboardSidebarProps {
   activeRoute: string;
@@ -27,6 +29,7 @@ interface DashboardSidebarProps {
   setMobileOpen?: (open: boolean) => void;
   userData?: any;
   user?: any;
+  toggleSidebar?: () => void;
 }
 
 export default function DashboardSidebar({
@@ -36,6 +39,7 @@ export default function DashboardSidebar({
   setMobileOpen = () => {},
   userData,
   user,
+  toggleSidebar,
 }: DashboardSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -43,6 +47,7 @@ export default function DashboardSidebar({
   const [dashboardType, setDashboardType] = useState<"employee" | "employer">(
     pathname?.includes("/dashboard/employer") ? "employer" : "employee"
   );
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Check if the current path is for employer dashboard
@@ -71,12 +76,39 @@ export default function DashboardSidebar({
     }
   }, []);
 
+  // Effect to handle clicks outside the desktop sidebar
+  useEffect(() => {
+    // Only run this logic on the client and for desktop view
+    if (typeof window === "undefined" || isMobile || !toggleSidebar) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isOpen && // Only if the sidebar is open
+        sidebarRef.current &&
+        !sidebarRef.current.contains(event.target as Node)
+      ) {
+        toggleSidebar(); // Call the toggle function passed from layout
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    // Cleanup listener on component unmount or when isOpen changes
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, toggleSidebar, isMobile]);
+
   const handleDashboardSwitch = (type: "employee" | "employer") => {
     setDashboardType(type);
-    if (type === "employer") {
-      router.push("/dashboard/employer");
-    } else {
+    if (type === "employee") {
       router.push("/dashboard");
+    } else {
+      router.push("/dashboard/employer");
     }
   };
 
@@ -90,7 +122,41 @@ export default function DashboardSidebar({
     }
   };
 
-  const getNavigationItems = () => {
+  // Helper function to render NavItems with correct expanded state
+  const renderNavItems = (expandedState: boolean) => (
+    <>
+      <NavItem
+        href="/dashboard"
+        icon={<Home className="h-5 w-5" />}
+        label="Overview"
+        isActive={activeRoute === "overview"}
+        isExpanded={expandedState}
+      />
+      <NavItem
+        href="/dashboard/applications"
+        icon={<FileText className="h-5 w-5" />}
+        label="Applications"
+        isActive={activeRoute === "applications"}
+        isExpanded={expandedState}
+      />
+      <NavItem
+        href="/dashboard/job-status"
+        icon={<ClipboardCheck className="h-5 w-5" />}
+        label="Job Status"
+        isActive={activeRoute === "job-status"}
+        isExpanded={expandedState}
+      />
+      <NavItem
+        href="/dashboard/saved-jobs"
+        icon={<Star className="h-5 w-5" />}
+        label="Saved Jobs"
+        isActive={activeRoute === "saved-jobs"}
+        isExpanded={expandedState}
+      />
+    </>
+  );
+
+  const getNavigationItems = (isCurrentlyExpanded: boolean) => {
     if (dashboardType === "employer") {
       return (
         <>
@@ -99,71 +165,85 @@ export default function DashboardSidebar({
             icon={<Home className="h-5 w-5" />}
             label="Overview"
             isActive={activeRoute === "overview"}
-            isExpanded={isOpen}
+            isExpanded={isCurrentlyExpanded}
           />
           <NavItem
             href="/dashboard/employer/jobs"
             icon={<Briefcase className="h-5 w-5" />}
             label="Posted Jobs"
             isActive={activeRoute === "jobs"}
-            isExpanded={isOpen}
+            isExpanded={isCurrentlyExpanded}
           />
           <NavItem
             href="/dashboard/employer/applicants"
             icon={<FileText className="h-5 w-5" />}
             label="Applicants"
             isActive={activeRoute === "applicants"}
-            isExpanded={isOpen}
+            isExpanded={isCurrentlyExpanded}
           />
         </>
       );
     }
-
-    return (
-      <>
-        <NavItem
-          href="/dashboard"
-          icon={<Home className="h-5 w-5" />}
-          label="Overview"
-          isActive={activeRoute === "overview"}
-          isExpanded={isOpen}
-        />
-        <NavItem
-          href="/dashboard/applications"
-          icon={<FileText className="h-5 w-5" />}
-          label="Applications"
-          isActive={activeRoute === "applications"}
-          isExpanded={isOpen}
-        />
-        <NavItem
-          href="/dashboard/job-status"
-          icon={<ClipboardCheck className="h-5 w-5" />}
-          label="Job Status"
-          isActive={activeRoute === "job-status"}
-          isExpanded={isOpen}
-        />
-        <NavItem
-          href="/dashboard/saved-jobs"
-          icon={<Star className="h-5 w-5" />}
-          label="Saved Jobs"
-          isActive={activeRoute === "saved-jobs"}
-          isExpanded={isOpen}
-        />
-      </>
-    );
+    return renderNavItems(isCurrentlyExpanded);
   };
 
-  const sidebarContent = (
+  // Helper function to render Account NavItems
+  const renderAccountNavItems = (expandedState: boolean) => (
+    <nav className="mt-2 space-y-1">
+      <NavItem
+        href={`/dashboard/profile`}
+        icon={<User className="h-5 w-5" />}
+        label="Profile"
+        isActive={activeRoute === "profile"}
+        isExpanded={expandedState}
+      />
+      <NavItem
+        href={`/dashboard/settings`}
+        icon={<Settings className="h-5 w-5" />}
+        label="Settings"
+        isActive={activeRoute === "settings"}
+        isExpanded={expandedState}
+      />
+      <NavItem
+        href="#"
+        icon={<LogOut className="h-5 w-5" />}
+        label="Logout"
+        isActive={false}
+        isExpanded={expandedState}
+        onClick={handleLogout}
+      />
+    </nav>
+  );
+
+  const sidebarContent = (isCurrentlyExpanded: boolean) => (
     <>
-      <div className="p-4 border-b">
+      <div className="p-4 border-b relative">
         <Link
           href="/"
           className={`font-bold text-primary flex items-center ${
-            isOpen ? "text-2xl" : "text-xs"
+            isCurrentlyExpanded ? "text-2xl" : "text-xs justify-center"
           }`}
         >
-          {isOpen ? "Parttimejob" : "TM"}
+          {/* {isCurrentlyExpanded ? "Parttimejob" : "PJ"} */}
         </Link>
+
+        {!isMobile && toggleSidebar && (
+          <button
+            onClick={toggleSidebar}
+            className={`absolute top-1/2 -translate-y-1/2 right-2 p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground ${
+              !isCurrentlyExpanded ? "right-1/2 translate-x-1/2" : ""
+            }`}
+            aria-label={
+              isCurrentlyExpanded ? "Collapse sidebar" : "Expand sidebar"
+            }
+          >
+            {isCurrentlyExpanded ? (
+              <PanelLeft className="h-5 w-5" />
+            ) : (
+              <PanelRight className="h-5 w-5" />
+            )}
+          </button>
+        )}
       </div>
       <div className="flex-1 overflow-auto py-2">
         <nav className="space-y-1 px-2">
@@ -196,38 +276,15 @@ export default function DashboardSidebar({
               </div>
             </div>
           )}
-          {getNavigationItems()}
+          {getNavigationItems(isCurrentlyExpanded)}
         </nav>
         <div className="px-3 py-4 mt-6">
-          {isOpen && (
+          {isCurrentlyExpanded && (
             <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Account
             </h3>
           )}
-          <nav className="mt-2 space-y-1">
-            <NavItem
-              href={`/dashboard/profile`}
-              icon={<User className="h-5 w-5" />}
-              label="Profile"
-              isActive={activeRoute === "profile"}
-              isExpanded={isOpen}
-            />
-            <NavItem
-              href={`/dashboard/settings`}
-              icon={<Settings className="h-5 w-5" />}
-              label="Settings"
-              isActive={activeRoute === "settings"}
-              isExpanded={isOpen}
-            />
-            <NavItem
-              href="#"
-              icon={<LogOut className="h-5 w-5" />}
-              label="Logout"
-              isActive={false}
-              isExpanded={isOpen}
-              onClick={handleLogout}
-            />
-          </nav>
+          {renderAccountNavItems(isCurrentlyExpanded)}
         </div>
       </div>
       <div className="p-4 border-t">
@@ -243,7 +300,7 @@ export default function DashboardSidebar({
             />
             <AvatarFallback>{user?.displayName?.[0] || "U"}</AvatarFallback>
           </Avatar>
-          {isOpen && (
+          {isCurrentlyExpanded && (
             <div className="ml-3">
               <p className="text-sm font-medium">
                 {user?.displayName || "Complete Profile"}
@@ -258,25 +315,24 @@ export default function DashboardSidebar({
     </>
   );
 
-  // For mobile view, use Sheet
   if (isMobile) {
     return (
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="p-0 w-[280px]">
-          <div className="flex flex-col h-full">{sidebarContent}</div>
+          <div className="flex flex-col h-full">{sidebarContent(true)}</div>
         </SheetContent>
       </Sheet>
     );
   }
 
-  // For desktop view, use the regular sidebar
   return (
     <div
+      ref={sidebarRef}
       className={`hidden md:flex flex-col bg-card border-r h-screen sticky top-0 transition-all duration-300 ${
         isOpen ? "w-64" : "w-20"
       }`}
     >
-      {sidebarContent}
+      {sidebarContent(isOpen)}
     </div>
   );
 }

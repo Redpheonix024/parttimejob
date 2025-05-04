@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { auth } from "@/app/config/firebase";
 import { signOut } from "firebase/auth";
-import { useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface AdminSidebarProps {
   isSidebarOpen: boolean;
@@ -33,22 +33,30 @@ export default function AdminSidebar({
 }: AdminSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
-  // Close sidebar when clicking outside on mobile
+  // Close sidebar when clicking outside (handles both mobile and desktop)
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      // Only run on mobile screens
-      if (window.innerWidth < 768 && isSidebarOpen) {
-        const sidebar = document.getElementById("admin-sidebar");
-        if (sidebar && !sidebar.contains(e.target as Node)) {
-          setIsSidebarOpen(false);
-        }
+      if (
+        isSidebarOpen &&
+        sidebarRef.current &&
+        !sidebarRef.current.contains(e.target as Node)
+      ) {
+        // Check screen size directly if needed, though toggle should handle it
+        // if (window.innerWidth < 768) { // Example: Only close on mobile via outside click
+        setIsSidebarOpen(false);
+        // }
       }
     };
 
-    document.addEventListener("mousedown", handleOutsideClick);
+    if (isSidebarOpen) {
+      // Add listener only when open
+      document.addEventListener("mousedown", handleOutsideClick);
+    }
+
     return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [isSidebarOpen, setIsSidebarOpen]);
+  }, [isSidebarOpen, setIsSidebarOpen]); // Removed sidebarRef from deps as it's stable
 
   // Auto-close sidebar on mobile view and route changes
   useEffect(() => {
@@ -110,6 +118,7 @@ export default function AdminSidebar({
 
       {/* Sidebar */}
       <div
+        ref={sidebarRef}
         id="admin-sidebar"
         className={`bg-card border-r h-screen z-50 transition-all duration-300 
           md:sticky md:top-0 fixed top-0 bottom-0 left-0

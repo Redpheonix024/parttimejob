@@ -19,8 +19,57 @@ import JobCard from "@/components/dashboard/job-card";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { usersApi } from "@/utils/api";
 import { toast } from "sonner";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  getCountFromServer,
+  getDoc,
+  doc,
+  limit,
+  orderBy,
+} from "firebase/firestore";
+import { db } from "@/app/config/firebase";
+import { format } from "date-fns";
+import { usersApi } from "@/utils/api";
+import { calculateProfileCompletion } from "@/app/utils/profile-completion";
+
+// Define the Application type based on expected props
+interface Application {
+  id: string; // Added ID based on typical data structures
+  jobTitle: string;
+  company: string;
+  location: string;
+  salary: string;
+  type: string;
+  appliedDate: string;
+  status: string;
+  jobId: string; // Added jobId based on potential needs
+}
+
+// Add interfaces from applications page
+interface JobData {
+  location?: {
+    display?: string;
+  };
+  salaryAmount?: string;
+  salaryType?: string;
+  jobType?: string;
+}
+
+interface ApplicationData {
+  jobTitle: string;
+  company: string;
+  jobId: string;
+  status: string;
+  createdAt: {
+    toDate: () => Date;
+  };
+  // Add other fields if present in your Firestore data
+  userId?: string;
+}
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -28,7 +77,138 @@ export default function Dashboard() {
   const { profile, getProfilePicture, updateProfilePicture } = useUserProfile();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+  const [recentApplicationsData, setRecentApplicationsData] = useState<
+    Application[]
+  >([]);
+  const [isLoadingApplications, setIsLoadingApplications] = useState(true);
+  const [applicationsError, setApplicationsError] = useState<string | null>(
+    null
+  );
+
+  const [totalApplications, setTotalApplications] = useState<number | null>(
+    null
+  );
+  const [profileCompletion, setProfileCompletion] = useState(0);
+  const [missingProfileItems, setMissingProfileItems] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchRecentApplications = async () => {
+      if (!user?.uid) return; // Don't fetch if user is not available
+
+      setIsLoadingApplications(true);
+      setApplicationsError(null);
+      try {
+        // Fetch recent applications from Firestore
+        const applicationsQuery = query(
+          collection(db, "applications"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc"), // Order by creation date descending
+          limit(3) // Limit to 3 recent applications for the dashboard
+        );
+
+        const querySnapshot = await getDocs(applicationsQuery);
+        const fetchedApplications = await Promise.all(
+          querySnapshot.docs.map(async (docSnapshot) => {
+            const data = docSnapshot.data() as ApplicationData;
+
+            // Fetch job details if jobId exists
+            let jobDetails = {
+              location: "Remote",
+              salary: "Not specified",
+              type: "Not specified",
+            };
+
+            if (data.jobId) {
+              try {
+                const jobDocRef = doc(db, "jobs", data.jobId);
+                const jobDoc = await getDoc(jobDocRef);
+                if (jobDoc.exists()) {
+                  const jobData = jobDoc.data() as JobData;
+                  jobDetails = {
+                    location: jobData.location?.display || "Remote",
+                    salary: jobData.salaryAmount
+                      ? `${jobData.salaryAmount} ${jobData.salaryType || "/hr"}` // Added default salaryType
+                      : "Not specified",
+                    type: jobData.jobType || "Not specified",
+                  };
+                }
+              } catch (error) {
+                console.error(
+                  "Error fetching job details for dashboard:",
+                  error
+                );
+              }
+            }
+
+            return {
+              id: docSnapshot.id,
+              jobTitle: data.jobTitle,
+              company: data.company,
+              location: jobDetails.location,
+              salary: jobDetails.salary,
+              type: jobDetails.type,
+              appliedDate: data.createdAt
+                ? format(data.createdAt.toDate(), "MMM d, yyyy")
+                : "N/A",
+              status: data.status || "Applied",
+              jobId: data.jobId,
+            } as Application;
+          })
+        );
+
+        setRecentApplicationsData(fetchedApplications);
+      } catch (error) {
+        console.error("Error fetching recent applications:", error);
+        setApplicationsError("An error occurred while fetching applications.");
+        toast.error("An error occurred while fetching recent applications.");
+      } finally {
+        setIsLoadingApplications(false);
+      }
+
+      // Fetch total application count
+      try {
+        const countQuery = query(
+          collection(db, "applications"),
+          where("userId", "==", user.uid)
+        );
+        const snapshot = await getCountFromServer(countQuery);
+        setTotalApplications(snapshot.data().count);
+      } catch (error) {
+        console.error("Error fetching total application count:", error);
+        // Handle error appropriately, maybe set count to 0 or show an error message
+        setTotalApplications(0);
+      }
+    };
+
+    if (user?.uid) {
+      fetchRecentApplications();
+    }
+  }, [user?.uid]); // Refetch if user changes
+
+  // Calculate profile completion when profile data is available
+  useEffect(() => {
+    if (profile) {
+      const completionData = calculateProfileCompletion(profile);
+      setProfileCompletion(completionData.percentage);
+
+      // Extract missing items from all sections
+      const missingItems = completionData.sections
+        .filter((section) => !section.completed && section.remainingFields)
+        .flatMap((section) => section.remainingFields || []); // Use flatMap to combine arrays
+
+      setMissingProfileItems(missingItems);
+    }
+  }, [profile]);
+
+  // Add handler for removing application (filters local state for now)
+  const handleRemoveApplication = (applicationId: string) => {
+    setRecentApplicationsData((prevApps) =>
+      prevApps.filter((app) => app.id !== applicationId)
+    );
+    // TODO: Add backend call to actually delete/withdraw the application if needed
+    toast.info("Application removed from this view.");
+  };
+
   const handleFileSelect = () => {
     fileInputRef.current?.click();
   };
@@ -38,16 +218,16 @@ export default function Dashboard() {
     if (!files || files.length === 0 || !user?.uid) return;
 
     const file = files[0];
-    
+
     // Check file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
       return;
     }
-    
+
     // Check file size (limit to 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size exceeds 5MB limit');
+      toast.error("File size exceeds 5MB limit");
       return;
     }
 
@@ -55,30 +235,30 @@ export default function Dashboard() {
     try {
       setIsUploading(true);
       const response = await usersApi.uploadProfilePicture(file, user.uid);
-      
+
       if (response.success) {
         await updateProfilePicture(response.imageUrl);
-        toast.success('Profile picture updated successfully');
+        toast.success("Profile picture updated successfully");
       }
     } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Failed to upload profile picture');
+      console.error("Upload error:", error);
+      toast.error("Failed to upload profile picture");
     } finally {
       setIsUploading(false);
       // Reset the input
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
-  
+
   return (
     <DashboardLayout activeRoute="overview" userData={profile} user={user}>
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleFileChange} 
-        className="hidden" 
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
         accept="image/*"
       />
       <div className="space-y-6">
@@ -94,15 +274,16 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <StatCard
             title="Applications"
-            value="12"
-            description="4 in progress, 2 interviews"
+            value={
+              totalApplications !== null ? totalApplications.toString() : "..."
+            }
+            description="View all applications"
           />
           <StatCard
-            title="Profile Views"
-            value="48"
-            description="+12% from last week"
+            title="Profile Completion"
+            value={`${profileCompletion}%`}
+            progress={profileCompletion}
           />
-          <StatCard title="Profile Completion" value="85%" progress={85} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -116,9 +297,21 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentApplications.map((application, index) => (
-                    <ApplicationCard key={index} application={application} />
-                  ))}
+                  {isLoadingApplications ? (
+                    <p>Loading applications...</p>
+                  ) : applicationsError ? (
+                    <p className="text-red-500">{applicationsError}</p>
+                  ) : recentApplicationsData.length > 0 ? (
+                    recentApplicationsData.map((application) => (
+                      <ApplicationCard
+                        key={application.id}
+                        application={application}
+                        onRemove={() => handleRemoveApplication(application.id)}
+                      />
+                    ))
+                  ) : (
+                    <p>No recent applications found.</p>
+                  )}
                 </div>
               </CardContent>
               <CardFooter>
@@ -128,6 +321,8 @@ export default function Dashboard() {
               </CardFooter>
             </Card>
 
+            {/* Remove Upcoming Interviews Card */}
+            {/* 
             <Card>
               <CardHeader>
                 <CardTitle>Upcoming Interviews</CardTitle>
@@ -141,6 +336,7 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
+            */}
           </div>
 
           <div>
@@ -156,14 +352,18 @@ export default function Dashboard() {
                   <div className="relative group">
                     <Avatar className="h-16 w-16">
                       <AvatarImage
-                        src={profile?.profilePicture || profile?.photoURL || getProfilePicture()}
+                        src={
+                          profile?.profilePicture ||
+                          profile?.photoURL ||
+                          getProfilePicture()
+                        }
                         alt={user?.displayName || "User"}
                       />
                       <AvatarFallback>
                         {user?.displayName?.[0] || "U"}
                       </AvatarFallback>
                     </Avatar>
-                    <button 
+                    <button
                       className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 cursor-pointer"
                       onClick={handleFileSelect}
                       disabled={isUploading}
@@ -174,48 +374,49 @@ export default function Dashboard() {
                   </div>
                   <div className="ml-4">
                     <h3 className="font-medium">
-                      {user?.displayName || "Complete Your Profile"}
+                      <span className="font-medium">
+                        {profile?.firstName ||
+                          user?.displayName ||
+                          "Complete Your Profile"}
+                      </span>
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      {user?.email || "Add your title"}
+                      {profile?.email || user?.email || "Add your email"}
                     </p>
-                    <div className="flex items-center mt-1">
-                      <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                      <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                      <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                      <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                      <Star className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground ml-1">
-                        (4.0)
-                      </span>
-                    </div>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div>
                     <div className="flex justify-between text-sm mb-1">
                       <span>Profile Completion</span>
-                      <span className="font-medium">85%</span>
+                      <span className="font-medium">{profileCompletion}%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full bg-primary"
-                        style={{ width: "85%" }}
+                        style={{ width: `${profileCompletion}%` }}
                       ></div>
                     </div>
                   </div>
                   <div className="text-sm">
                     <p className="font-medium mb-2">Complete these items:</p>
-                    <ul className="space-y-1">
-                      <li className="flex items-center text-muted-foreground">
-                        <span className="mr-2">•</span>
-                        Add your education history
-                      </li>
-                      <li className="flex items-center text-muted-foreground">
-                        <span className="mr-2">•</span>
-                        Upload your resume
-                      </li>
-                    </ul>
+                    {missingProfileItems.length > 0 ? (
+                      <ul className="space-y-1">
+                        {missingProfileItems.map((item, index) => (
+                          <li
+                            key={index}
+                            className="flex items-center text-muted-foreground"
+                          >
+                            <span className="mr-2">•</span>
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-green-600">
+                        Profile is complete!
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -226,6 +427,8 @@ export default function Dashboard() {
               </CardFooter>
             </Card>
 
+            {/* Remove Recommended Jobs Card */}
+            {/*             
             <Card>
               <CardHeader>
                 <CardTitle>Recommended Jobs</CardTitle>
@@ -245,7 +448,8 @@ export default function Dashboard() {
                   View All Recommendations
                 </Button>
               </CardFooter>
-            </Card>
+            </Card> 
+            */}
           </div>
         </div>
       </div>
@@ -267,19 +471,16 @@ const recentApplications = [
     jobTitle: "Frontend Developer",
     company: "Tech Solutions Inc.",
     appliedDate: "2 days ago",
-    status: "Pending",
   },
   {
     jobTitle: "UX Designer",
     company: "Creative Agency",
     appliedDate: "1 week ago",
-    status: "Interview",
   },
   {
     jobTitle: "Content Writer",
     company: "Media Group",
     appliedDate: "3 days ago",
-    status: "Reviewed",
   },
 ];
 
@@ -330,7 +531,6 @@ const allApplications = [
     salary: "₹2250-3000/hr",
     type: "Part-time",
     appliedDate: "2 days ago",
-    status: "Pending",
   },
   {
     jobTitle: "UX Designer",
@@ -339,7 +539,6 @@ const allApplications = [
     salary: "₹1875-2625/hr",
     type: "Contract",
     appliedDate: "1 week ago",
-    status: "Interview",
   },
   {
     jobTitle: "Content Writer",
@@ -348,7 +547,6 @@ const allApplications = [
     salary: "₹1500-1875/hr",
     type: "Part-time",
     appliedDate: "3 days ago",
-    status: "Reviewed",
   },
   {
     jobTitle: "Social Media Manager",
@@ -357,7 +555,6 @@ const allApplications = [
     salary: "₹1350-1650/hr",
     type: "Part-time",
     appliedDate: "2 weeks ago",
-    status: "Rejected",
   },
   {
     jobTitle: "Customer Support",
@@ -366,7 +563,6 @@ const allApplications = [
     salary: "₹1875-2250/hr",
     type: "Weekend",
     appliedDate: "5 days ago",
-    status: "Pending",
   },
 ];
 
