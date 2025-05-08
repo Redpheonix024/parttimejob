@@ -65,13 +65,33 @@ import {
   orderBy,
   limit,
   startAfter,
+  Timestamp,
+  doc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/app/config/firebase";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Job } from "@/types/job";
+import type { ColumnDef } from "@tanstack/react-table";
 
 const ITEMS_PER_PAGE = 10;
+
+// Update the Job type to handle our usage in this component
+type JobWithUI = Job & {
+  id: string;
+  title: string;
+  company: string;
+  category: string;
+  location: string; // Make sure location is a string for UI display
+  postedDate: string;
+  status: string;
+  rate: string;
+  duration: string;
+  applications: number;
+  userId: string;
+  hours: string;
+};
 
 const formatDate = (timestamp: any) => {
   if (!timestamp) return "N/A";
@@ -102,11 +122,12 @@ export default function AdminJobs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<JobWithUI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastVisible, setLastVisible] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
+  const [sortOption, setSortOption] = useState("createdAt_desc");
 
   const fetchJobs = useCallback(
     async (isInitial = false) => {
@@ -114,11 +135,36 @@ export default function AdminJobs() {
         setIsLoading(true);
         console.log("Fetching jobs...");
         const jobsRef = collection(db, "jobs");
-        let q = query(
-          jobsRef,
-          orderBy("createdAt", "desc"),
-          limit(ITEMS_PER_PAGE)
-        );
+
+        // Parse sort option into field and direction
+        const [field, direction] = sortOption.split("_");
+        console.log(`Sorting by ${field} in ${direction} order`);
+
+        // Build query - explicitly handle createdAt special case to ensure we get same behavior as before
+        let q;
+        if (field === "createdAt") {
+          // This is how it was working before - use the same approach
+          q = query(
+            jobsRef,
+            orderBy("createdAt", direction as "asc" | "desc"),
+            limit(ITEMS_PER_PAGE)
+          );
+        } else {
+          // For other fields, use the new dynamic approach
+          q = query(
+            jobsRef,
+            orderBy(field, direction as "asc" | "desc"),
+            limit(ITEMS_PER_PAGE)
+          );
+        }
+
+        // Debug the query configuration
+        console.log("Query Config:", {
+          field,
+          direction,
+          statusFilter,
+          limit: ITEMS_PER_PAGE,
+        });
 
         // Apply status filter if not "all"
         if (statusFilter !== "all") {
@@ -155,8 +201,9 @@ export default function AdminJobs() {
             duration: data.duration || "Not specified",
             applications: data.applications?.length || 0,
             userId: data.userId || "",
+            hours: data.hours || "",
           };
-        }) as Job[];
+        }) as JobWithUI[];
 
         setJobs((prevJobs) =>
           isInitial ? jobsData : [...prevJobs, ...jobsData]
@@ -168,13 +215,13 @@ export default function AdminJobs() {
         setIsLoading(false);
       }
     },
-    [statusFilter, lastVisible]
+    [statusFilter, lastVisible, sortOption]
   );
 
   // Initial load
   useEffect(() => {
     fetchJobs(true);
-  }, [statusFilter]);
+  }, [statusFilter, sortOption]);
 
   // Load more function
   const loadMore = useCallback(() => {
@@ -200,101 +247,32 @@ export default function AdminJobs() {
     router.push("/admin/login");
   };
 
-  const columns: ColumnDef<Job>[] = [
-    {
-      accessorKey: "title",
-      header: "Job",
-      cell: ({ row }) => {
-        const job = row.original;
-        return (
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-md bg-primary/10 flex items-center justify-center">
-              <Briefcase className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <Link
-                href={`/admin/jobs/${job.id}`}
-                className="font-medium hover:underline"
-              >
-                {job.title}
-              </Link>
-              <div className="text-sm text-muted-foreground">{job.company}</div>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "category",
-      header: "Category",
-      cell: ({ row }) => {
-        const job = row.original;
-        return <Badge variant="secondary">{job.category}</Badge>;
-      },
-    },
-    {
-      accessorKey: "location",
-      header: "Location",
-    },
-    {
-      accessorKey: "postedDate",
-      header: "Posted",
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => {
-        const job = row.original;
-        return (
-          <Badge
-            variant={
-              job.status === "active"
-                ? "default"
-                : job.status === "pending"
-                ? "outline"
-                : job.status === "expired"
-                ? "destructive"
-                : "secondary"
-            }
-          >
-            {job.status}
-          </Badge>
-        );
-      },
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => {
-        const job = row.original;
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/admin/jobs/${job.id}`}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  View Details
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
-  ];
+  const deleteJob = async (jobId: string) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this job? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      console.log("Deleting job with ID:", jobId);
+
+      // Delete the job document from Firestore
+      const jobRef = doc(db, "jobs", jobId);
+      await deleteDoc(jobRef);
+
+      // Update local state to remove the deleted job
+      setJobs(jobs.filter((job) => job.id !== jobId));
+
+      // Show success message
+      toast.success("Job deleted successfully");
+    } catch (error) {
+      console.error("Error deleting job:", error);
+      toast.error("Failed to delete job. Please try again.");
+    }
+  };
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -378,6 +356,39 @@ export default function AdminJobs() {
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="expired">Expired</SelectItem>
                         <SelectItem value="draft">Draft</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-56">
+                    <Select
+                      value={sortOption}
+                      onValueChange={(value) => {
+                        setSortOption(value);
+                        setLastVisible(null); // Reset pagination
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sort By" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="createdAt_desc">
+                          Newest First
+                        </SelectItem>
+                        <SelectItem value="createdAt_asc">
+                          Oldest First
+                        </SelectItem>
+                        <SelectItem value="title_asc">Title (A-Z)</SelectItem>
+                        <SelectItem value="title_desc">Title (Z-A)</SelectItem>
+                        <SelectItem value="company_asc">
+                          Company (A-Z)
+                        </SelectItem>
+                        <SelectItem value="company_desc">
+                          Company (Z-A)
+                        </SelectItem>
+                        <SelectItem value="status_asc">Status (A-Z)</SelectItem>
+                        <SelectItem value="status_desc">
+                          Status (Z-A)
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -465,7 +476,13 @@ export default function AdminJobs() {
                                   : "Activate"}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  deleteJob(job.id);
+                                }}
+                                className="text-destructive"
+                              >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Delete
                               </DropdownMenuItem>

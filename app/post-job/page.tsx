@@ -91,6 +91,7 @@ interface AddressData {
   city: string;
   state: string;
   zip: string;
+  buildingName: string; // Add new field for building name/number
 }
 
 // Define interface for form data
@@ -118,6 +119,7 @@ interface FormData {
   city: string;
   state: string;
   zip: string;
+  buildingName: string; // Building number or house name
 }
 
 // Dynamically import the Map component to avoid SSR issues
@@ -135,16 +137,17 @@ export default function PostJob() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [workLocation, setWorkLocation] = useState("on-site");
   const [location, setLocation] = useState<LocationData>({
-    lat: 40.7128,
-    lng: -74.006, // Default to New York coordinates
+    lat: 10.52753, // Default to Thrissur, Kerala
+    lng: 76.214514, // Default to Thrissur, Kerala
   });
   const [address, setAddress] = useState<AddressData>({
     address: "",
     city: "",
     state: "",
     zip: "",
+    buildingName: "", // Initialize building name field
   });
-  const [showMap, setShowMap] = useState(false);
+  const [showMap, setShowMap] = useState(true); // Open map by default
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([
@@ -192,6 +195,7 @@ export default function PostJob() {
     city: "",
     state: "",
     zip: "",
+    buildingName: "", // Initialize building name field
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -201,16 +205,30 @@ export default function PostJob() {
 
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Add state to track if admin contact has been initialized
+  const [adminContactInitialized, setAdminContactInitialized] = useState(false);
+
   // Check if user is admin
   useEffect(() => {
     const checkAdmin = async () => {
       if (user) {
         const hasAdminRole = await checkAdminRole(user.uid);
         setIsAdmin(hasAdminRole);
+
+        // If user is admin and we haven't initialized the admin contact yet
+        if (hasAdminRole && !adminContactInitialized) {
+          setContacts([
+            {
+              name: "Ramshad",
+              phone: "6282837529", // Default admin phone number
+            },
+          ]);
+          setAdminContactInitialized(true);
+        }
       }
     };
     checkAdmin();
-  }, [user]);
+  }, [user, adminContactInitialized]);
 
   // Voice recording
   const startRecording = async () => {
@@ -354,36 +372,44 @@ export default function PostJob() {
   }, [audioUrl]);
 
   // Handle map click to update location
-  const handleMapClick = useCallback(async (lat: number, lng: number) => {
-    setLocation({ lat, lng });
+  const handleMapClick = useCallback(
+    async (lat: number, lng: number) => {
+      setLocation({ lat, lng }); // Always update marker position
 
-    // Reverse geocode to get address
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
-      );
-      const data = await response.json();
-
-      if (data.address) {
-        const address = data.address;
-        setFormData((prev) => ({
-          ...prev,
-          address: address.road || address.highway || address.pedestrian || "",
-          city:
-            address.city ||
-            address.town ||
-            address.village ||
-            address.suburb ||
-            "",
-          state: address.state || address.region || "",
-          zip: address.postcode || "",
-        }));
+      if (!isMapAttached) {
+        return; // Do not geocode and update form fields if map is detached
       }
-    } catch (error) {
-      console.error("Error getting address:", error);
-      toast.error("Could not fetch address details");
-    }
-  }, []);
+
+      // Reverse geocode to get address
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+        );
+        const data = await response.json();
+
+        if (data.address) {
+          const address = data.address;
+          setFormData((prev) => ({
+            ...prev,
+            address:
+              address.road || address.highway || address.pedestrian || "",
+            city:
+              address.city ||
+              address.town ||
+              address.village ||
+              address.suburb ||
+              "",
+            state: address.state || address.region || "",
+            zip: address.postcode || "",
+          }));
+        }
+      } catch (error) {
+        console.error("Error getting address:", error);
+        toast.error("Could not fetch address details");
+      }
+    },
+    [isMapAttached]
+  ); // Added isMapAttached
 
   // Handle address search
   const handleAddressSearch = useCallback(async (query: string) => {
@@ -445,36 +471,40 @@ export default function PostJob() {
         const { latitude, longitude } = position.coords;
 
         setLocation({
+          // Always update map center
           lat: latitude,
           lng: longitude,
         });
 
-        // Reverse geocode to get address
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
-          );
-          const data = await response.json();
+        if (isMapAttached) {
+          // Check if map is attached
+          // Reverse geocode to get address
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+            );
+            const data = await response.json();
 
-          if (data.address) {
-            const address = data.address;
-            setFormData((prev) => ({
-              ...prev,
-              address:
-                address.road || address.highway || address.pedestrian || "",
-              city:
-                address.city ||
-                address.town ||
-                address.village ||
-                address.suburb ||
-                "",
-              state: address.state || address.region || "",
-              zip: address.postcode || "",
-            }));
+            if (data.address) {
+              const address = data.address;
+              setFormData((prev) => ({
+                ...prev,
+                address:
+                  address.road || address.highway || address.pedestrian || "",
+                city:
+                  address.city ||
+                  address.town ||
+                  address.village ||
+                  address.suburb ||
+                  "",
+                state: address.state || address.region || "",
+                zip: address.postcode || "",
+              }));
+            }
+          } catch (error) {
+            console.error("Error getting address:", error);
+            toast.error("Could not fetch address details");
           }
-        } catch (error) {
-          console.error("Error getting address:", error);
-          toast.error("Could not fetch address details");
         }
 
         setIsLoadingLocation(false);
@@ -486,7 +516,7 @@ export default function PostJob() {
       },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
-  }, []);
+  }, [isMapAttached]); // Added isMapAttached
 
   // Handle input change
   const handleChange = (
@@ -654,7 +684,11 @@ export default function PostJob() {
 
       // Add location data if on-site
       if (workLocation === "on-site") {
+        // Create a Google Maps URL for the location
+        const googleMapsUrl = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
+
         jobData.location = {
+          buildingName: formData.buildingName,
           address: formData.address,
           city: formData.city,
           state: formData.state,
@@ -663,6 +697,7 @@ export default function PostJob() {
             lat: location.lat,
             lng: location.lng,
           },
+          googleMapsUrl: googleMapsUrl, // Add Google Maps URL
         };
       }
 
@@ -947,7 +982,7 @@ export default function PostJob() {
                   <Label htmlFor="title">Job Title</Label>
                   <Input
                     id="title"
-                    placeholder="e.g. Weekend Barista, Event Photographer"
+                    placeholder="e.g. Cattering,loading unloading etc"
                     required
                     value={formData.title}
                     onChange={handleChange}
@@ -962,10 +997,10 @@ export default function PostJob() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="company">Company/Organization</Label>
+                    <Label htmlFor="company">Agency Name</Label>
                     <Input
                       id="company"
-                      placeholder="Your company name"
+                      placeholder="Agency name if you wish to specify the agency"
                       required
                       value={formData.company}
                       onChange={handleChange}
@@ -1017,7 +1052,32 @@ export default function PostJob() {
                       placeholder="Number of people needed"
                       required
                       value={formData.positions}
-                      onChange={handleChange}
+                      onChange={(e) => {
+                        const value = Math.abs(
+                          Math.floor(Number(e.target.value))
+                        );
+                        // Create a synthetic event object that matches the expected type
+                        const syntheticEvent = {
+                          target: { id: "positions", value: value.toString() },
+                          currentTarget: e.currentTarget,
+                          bubbles: e.bubbles,
+                          cancelable: e.cancelable,
+                          defaultPrevented: e.defaultPrevented,
+                          eventPhase: e.eventPhase,
+                          isTrusted: e.isTrusted,
+                          nativeEvent: e.nativeEvent,
+                          preventDefault: e.preventDefault,
+                          isDefaultPrevented: e.isDefaultPrevented,
+                          stopPropagation: e.stopPropagation,
+                          isPropagationStopped: e.isPropagationStopped,
+                          persist: e.persist,
+                          timeStamp: e.timeStamp,
+                          type: e.type,
+                        } as React.ChangeEvent<
+                          HTMLInputElement | HTMLTextAreaElement
+                        >;
+                        handleChange(syntheticEvent);
+                      }}
                       className={formErrors.positions ? "border-red-500" : ""}
                     />
                     {formErrors.positions && (
@@ -1110,7 +1170,7 @@ export default function PostJob() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="startDate">Job Start Date</Label>
+                    <Label htmlFor="startDate">Job Date(Working date)</Label>
                     <Input
                       id="startDate"
                       type="date"
@@ -1128,7 +1188,8 @@ export default function PostJob() {
 
                   <div className="space-y-2">
                     <Label htmlFor="endDate">
-                      Job End Date (if applicable)
+                      Specify a date to withdraw the specific job listing(if not
+                      applicaple leave blank)
                     </Label>
                     <Input
                       id="endDate"
@@ -1137,9 +1198,9 @@ export default function PostJob() {
                       onChange={handleChange}
                       className={formErrors.endDate ? "border-red-500" : ""}
                     />
-                    <p className="text-xs text-muted-foreground">
+                    {/* <p className="text-xs text-muted-foreground">
                       Leave blank for ongoing positions
-                    </p>
+                    </p> */}
                     {formErrors.endDate && (
                       <p className="text-red-500 text-xs mt-1">
                         {formErrors.endDate}
@@ -1487,6 +1548,9 @@ export default function PostJob() {
                         <SelectItem value="less-than-10">
                           Less than 10 hours
                         </SelectItem>
+                        <SelectItem value="unable-to-mention">
+                          Unable to mention
+                        </SelectItem>
                         <SelectItem value="10-15">10-15 hours</SelectItem>
                         <SelectItem value="15-20">15-20 hours</SelectItem>
                         <SelectItem value="20-30">20-30 hours</SelectItem>
@@ -1637,7 +1701,12 @@ export default function PostJob() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => setIsMapAttached(!isMapAttached)}
+                          onClick={() => {
+                            const newAttachState = !isMapAttached;
+                            setIsMapAttached(newAttachState);
+                            // If attaching the map, show it; if detaching, hide it
+                            setShowMap(newAttachState);
+                          }}
                           className="flex items-center gap-2"
                         >
                           {isMapAttached ? (
@@ -1715,6 +1784,22 @@ export default function PostJob() {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
+                          <Label htmlFor="buildingName">
+                            Building No/House Name please fill this feild 
+                          </Label>
+                          <Input
+                            id="buildingName"
+                            placeholder="Enter building number or house name"
+                            value={formData.buildingName}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                buildingName: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
                           <Label htmlFor="address">Address</Label>
                           <Input
                             id="address"
@@ -1743,7 +1828,7 @@ export default function PostJob() {
                                 city: e.target.value,
                               }))
                             }
-                            disabled={isMapAttached}
+                            disabled={!isMapAttached}
                           />
                         </div>
                         <div className="space-y-2">
@@ -1758,7 +1843,7 @@ export default function PostJob() {
                                 state: e.target.value,
                               }))
                             }
-                            disabled={isMapAttached}
+                            disabled={!isMapAttached}
                           />
                         </div>
                         <div className="space-y-2">
@@ -1773,7 +1858,7 @@ export default function PostJob() {
                                 zip: e.target.value,
                               }))
                             }
-                            disabled={isMapAttached}
+                            disabled={!isMapAttached}
                           />
                         </div>
                       </div>
@@ -2130,10 +2215,36 @@ export default function PostJob() {
                       id="positions"
                       type="number"
                       min="1"
+                      step="1"
                       placeholder="Number of people needed"
                       required
                       value={formData.positions}
-                      onChange={handleChange}
+                      onChange={(e) => {
+                        const value = Math.abs(
+                          Math.floor(Number(e.target.value))
+                        );
+                        // Create a synthetic event object that matches the expected type
+                        const syntheticEvent = {
+                          target: { id: "positions", value: value.toString() },
+                          currentTarget: e.currentTarget,
+                          bubbles: e.bubbles,
+                          cancelable: e.cancelable,
+                          defaultPrevented: e.defaultPrevented,
+                          eventPhase: e.eventPhase,
+                          isTrusted: e.isTrusted,
+                          nativeEvent: e.nativeEvent,
+                          preventDefault: e.preventDefault,
+                          isDefaultPrevented: e.isDefaultPrevented,
+                          stopPropagation: e.stopPropagation,
+                          isPropagationStopped: e.isPropagationStopped,
+                          persist: e.persist,
+                          timeStamp: e.timeStamp,
+                          type: e.type,
+                        } as React.ChangeEvent<
+                          HTMLInputElement | HTMLTextAreaElement
+                        >;
+                        handleChange(syntheticEvent);
+                      }}
                       className={formErrors.positions ? "border-red-500" : ""}
                     />
                     {formErrors.positions && (
@@ -2226,7 +2337,7 @@ export default function PostJob() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="startDate">Job Start Date</Label>
+                    <Label htmlFor="startDate">Job Date</Label>
                     <Input
                       id="startDate"
                       type="date"
@@ -2603,6 +2714,9 @@ export default function PostJob() {
                         <SelectItem value="less-than-10">
                           Less than 10 hours
                         </SelectItem>
+                        <SelectItem value="unable-to-mention">
+                          Unable to mention
+                        </SelectItem>
                         <SelectItem value="10-15">10-15 hours</SelectItem>
                         <SelectItem value="15-20">15-20 hours</SelectItem>
                         <SelectItem value="20-30">20-30 hours</SelectItem>
@@ -2753,7 +2867,12 @@ export default function PostJob() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => setIsMapAttached(!isMapAttached)}
+                          onClick={() => {
+                            const newAttachState = !isMapAttached;
+                            setIsMapAttached(newAttachState);
+                            // If attaching the map, show it; if detaching, hide it
+                            setShowMap(newAttachState);
+                          }}
                           className="flex items-center gap-2"
                         >
                           {isMapAttached ? (
@@ -2831,6 +2950,22 @@ export default function PostJob() {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
+                          <Label htmlFor="buildingName">
+                            Building No/House Name
+                          </Label>
+                          <Input
+                            id="buildingName"
+                            placeholder="Enter building number or house name"
+                            value={formData.buildingName}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                buildingName: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
                           <Label htmlFor="address">Address</Label>
                           <Input
                             id="address"
@@ -2859,7 +2994,7 @@ export default function PostJob() {
                                 city: e.target.value,
                               }))
                             }
-                            disabled={isMapAttached}
+                            disabled={!isMapAttached}
                           />
                         </div>
                         <div className="space-y-2">
@@ -2874,7 +3009,7 @@ export default function PostJob() {
                                 state: e.target.value,
                               }))
                             }
-                            disabled={isMapAttached}
+                            disabled={!isMapAttached}
                           />
                         </div>
                         <div className="space-y-2">
@@ -2889,7 +3024,7 @@ export default function PostJob() {
                                 zip: e.target.value,
                               }))
                             }
-                            disabled={isMapAttached}
+                            disabled={!isMapAttached}
                           />
                         </div>
                       </div>
