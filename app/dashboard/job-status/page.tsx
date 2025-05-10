@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import DashboardLayout from "@/components/dashboard/dashboard-layout";
-import JobStatusCard from "@/components/dashboard/job-status-card";
-import JobTimeline from "@/components/dashboard/job-timeline";
+import { MapPin, Briefcase, Calendar } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,23 +12,31 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
-import {
-  Briefcase,
-  Calendar,
-  Clock,
-  MapPin,
-  Star,
-  AlertCircle,
-} from "lucide-react";
-import { RupeeIcon } from "@/components/ui/rupee-icon";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { jobsApi } from "@/utils/api";
-import type { JobStatus } from "@/types/job";
-import { useAuth } from "@/hooks/useAuth";
-import { useRouter } from "next/navigation";
-import { onSnapshot, query, collection, where } from "firebase/firestore";
+import { Button } from "@/components/ui/button";
+import JobTimeline from "@/components/dashboard/job-timeline";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/app/config/firebase";
+
+interface JobStatus {
+  id: string;
+  title: string;
+  company: string;
+  location: {
+    display?: string;
+    city: string;
+    state: string;
+  };
+  rate: string;
+  type: string;
+  status: "applied" | "approved" | "in-progress" | "completed" | "paid";
+  appliedDate: string;
+  approvedDate?: string;
+  startDate?: string;
+  endDate?: string;
+  paymentDate?: string;
+}
 
 export default function JobStatusPage() {
   const { user, loading: authLoading } = useAuth();
@@ -64,9 +71,42 @@ export default function JobStatusPage() {
       async (snapshot) => {
         try {
           setLoading(true);
-          // Get the latest job status data
-          const data = await jobsApi.getUserJobStatus(user.uid);
-          setJobs(data.jobs);
+          const jobsData: JobStatus[] = [];
+
+          snapshot.docs.forEach((doc) => {
+            const data = doc.data();
+            jobsData.push({
+              id: doc.id,
+              title: data.jobTitle || "Untitled Job",
+              company: data.company || "Unknown Company",
+              location: data.location || { city: "", state: "" },
+              rate: data.rate || "Not specified",
+              type: data.type || "Not specified",
+              status: (data.status?.toLowerCase() ||
+                "applied") as JobStatus["status"],
+              appliedDate: new Date(
+                data.createdAt?.seconds * 1000
+              ).toLocaleDateString(),
+              approvedDate: data.approvedDate
+                ? new Date(
+                    data.approvedDate?.seconds * 1000
+                  ).toLocaleDateString()
+                : undefined,
+              startDate: data.startDate
+                ? new Date(data.startDate?.seconds * 1000).toLocaleDateString()
+                : undefined,
+              endDate: data.endDate
+                ? new Date(data.endDate?.seconds * 1000).toLocaleDateString()
+                : undefined,
+              paymentDate: data.paymentDate
+                ? new Date(
+                    data.paymentDate?.seconds * 1000
+                  ).toLocaleDateString()
+                : undefined,
+            });
+          });
+
+          setJobs(jobsData);
           setError(null);
         } catch (err: any) {
           console.error("Failed to fetch jobs:", err);
@@ -96,36 +136,30 @@ export default function JobStatusPage() {
     }
   };
 
-  const filteredJobs =
-    selectedTab === "all"
-      ? jobs
-      : jobs.filter((job) => job.status === selectedTab);
+  const filteredJobs = jobs.filter((job) => {
+    if (selectedTab === "all") return true;
+    return job.status.toLowerCase() === selectedTab.toLowerCase();
+  });
 
-  // During auth loading, show nothing, as the layout will handle this
-  if (authLoading) {
-    return null;
-  }
-
-  // If user is not authenticated, don't show anything as we're redirecting
-  if (!user) {
-    return null;
-  }
-
-  // Content loading state is handled by loading.tsx
   if (loading) {
-    return null;
+    return (
+      <DashboardLayout activeRoute="job-status">
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">
+              Loading your job applications...
+            </p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
   }
 
   return (
-    <DashboardLayout activeRoute="job-status" userData={user} user={user}>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Job Status</h1>
-        <Button onClick={() => router.push("/jobs")}>Find More Jobs</Button>
-      </div>
-
+    <DashboardLayout activeRoute="job-status">
       {error && (
         <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -147,11 +181,25 @@ export default function JobStatusPage() {
         <TabsContent value={selectedTab}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredJobs.map((job) => (
-              <JobStatusCard
+              <div
                 key={job.id}
-                job={job}
-                onViewDetails={handleViewDetails}
-              />
+                className="bg-card border rounded-lg p-4 hover:border-primary transition-colors cursor-pointer"
+                onClick={() => handleViewDetails(job.id)}
+              >
+                <h3 className="font-medium">{job.title}</h3>
+                <p className="text-sm text-muted-foreground">{job.company}</p>
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    <span>Applied {job.appliedDate}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-sm font-medium capitalize">
+                      {job.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
             ))}
 
             {filteredJobs.length === 0 && (
@@ -168,7 +216,6 @@ export default function JobStatusPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Job Details Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-3xl">
           {selectedJob && (
@@ -190,7 +237,7 @@ export default function JobStatusPage() {
                       </span>
                     </div>
                     <div className="flex items-center">
-                      <RupeeIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <span className="font-medium text-lg mr-1">₹</span>
                       <span>{selectedJob.rate}</span>
                     </div>
                     <div className="flex items-center">
@@ -200,65 +247,10 @@ export default function JobStatusPage() {
                     {selectedJob.startDate && (
                       <div className="flex items-center">
                         <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span>Start Date: {selectedJob.startDate}</span>
-                      </div>
-                    )}
-                    {selectedJob.endDate && (
-                      <div className="flex items-center">
-                        <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                        <span>End Date: {selectedJob.endDate}</span>
+                        <span>Started {selectedJob.startDate}</span>
                       </div>
                     )}
                   </div>
-
-                  {selectedJob.paymentAmount && (
-                    <>
-                      <Separator className="my-4" />
-                      <h3 className="text-sm font-medium mb-3">
-                        Payment Details
-                      </h3>
-                      <div className="space-y-3">
-                        <div className="flex items-center">
-                          <RupeeIcon className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <span>Amount: {selectedJob.paymentAmount}</span>
-                        </div>
-                        {selectedJob.paymentDate && (
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                            <span>Payment Date: {selectedJob.paymentDate}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <span>
-                            Status:{" "}
-                            {selectedJob.paymentStatus === "paid"
-                              ? "Received"
-                              : "Pending"}
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {selectedJob.rating && (
-                    <>
-                      <Separator className="my-4" />
-                      <h3 className="text-sm font-medium mb-3">Your Rating</h3>
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-5 w-5 ${
-                              i < selectedJob.rating!
-                                ? "text-[#FACC15] fill-[#FACC15]"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
                 </div>
 
                 <div>

@@ -22,6 +22,8 @@ import {
   CheckCircle,
   Bookmark,
   BookmarkCheck,
+  MapPin,
+  PartyPopper,
 } from "lucide-react";
 import {
   doc,
@@ -76,6 +78,7 @@ export default function JobDetails() {
     phone: "",
     coverLetter: "",
     termsAccepted: false,
+    status: "",
   });
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
 
@@ -90,18 +93,35 @@ export default function JobDetails() {
           const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
+            console.log("User profile data:", userData);
             setUserProfile(userData);
 
-            // Pre-fill the form with user data
-            setApplicationForm((prev) => ({
-              ...prev,
-              name:
-                userData.firstName && userData.lastName
-                  ? `${userData.firstName} ${userData.lastName}`
-                  : userData.displayName || user.displayName || "",
+            // Create name from user data, avoiding any hardcoded values
+            let fullName = "";
+
+            // Only use firstName and lastName if both exist
+            if (userData.firstName && userData.lastName) {
+              fullName = `${userData.firstName} ${userData.lastName}`.trim();
+            }
+            // Fallback to display name from userData or user object
+            else if (userData.displayName) {
+              fullName = userData.displayName;
+            } else if (user.displayName) {
+              fullName = user.displayName;
+            }
+
+            console.log("Setting application name to:", fullName);
+
+            setApplicationForm({
+              name: fullName,
               email: userData.email || user.email || "",
               phone: userData.phone || user.phoneNumber || "",
-            }));
+              coverLetter: "",
+              termsAccepted: false,
+              status: "",
+            });
+          } else {
+            console.log("User document doesn't exist for UID:", user.uid);
           }
 
           // Check if user has already applied for this job
@@ -112,6 +132,16 @@ export default function JobDetails() {
         } catch (err) {
           console.error("Error fetching user data:", err);
         }
+      } else {
+        // Reset form when user logs out
+        setApplicationForm({
+          name: "",
+          email: "",
+          phone: "",
+          coverLetter: "",
+          termsAccepted: false,
+          status: "",
+        });
       }
     });
 
@@ -130,6 +160,14 @@ export default function JobDetails() {
 
       const querySnapshot = await getDocs(q);
       setHasApplied(!querySnapshot.empty);
+
+      if (!querySnapshot.empty) {
+        const applicationData = querySnapshot.docs[0].data();
+        setApplicationForm((prev) => ({
+          ...prev,
+          status: applicationData.status || "",
+        }));
+      }
     } catch (err) {
       console.error("Error checking application status:", err);
     }
@@ -171,6 +209,9 @@ export default function JobDetails() {
 
         const jobData = jobDoc.data();
 
+        // Debug logs for job data
+        console.log("Full job data:", jobData);
+
         // Enhanced data validation and formatting
         const formattedJob = {
           ...jobData,
@@ -180,12 +221,7 @@ export default function JobDetails() {
           companyLogo:
             jobData.companyLogo || "/placeholder.svg?height=40&width=40",
           description: jobData.description?.trim() || "",
-          location:
-            typeof jobData.location === "object"
-              ? jobData.location.display?.trim() ||
-                jobData.location.address?.trim() ||
-                "Remote"
-              : jobData.location?.trim() || "Remote",
+          location: jobData.location || {}, // Preserve the full location object
           type: jobData.type?.trim() || "Not specified",
           category: jobData.category?.trim() || "Not specified",
           hours: jobData.hours?.trim() || "Not specified",
@@ -261,20 +297,32 @@ export default function JobDetails() {
 
     // If location is an object
     if (typeof job.location === "object") {
-      // Check for display property first
-      if (job.location.display) return job.location.display;
+      const parts = [];
 
-      // Check for city and state combination
-      if (job.location.city && job.location.state) {
-        return `${job.location.city}, ${job.location.state}`;
+      // Add building name if available
+      if (job.location.buildingName) {
+        parts.push(job.location.buildingName);
       }
 
-      // Check for address
-      if (job.location.address) return job.location.address;
+      // Add address if available
+      if (job.location.address) {
+        parts.push(job.location.address);
+      }
 
-      // Check for individual properties
-      if (job.location.city) return job.location.city;
-      if (job.location.state) return job.location.state;
+      // Add city and state
+      if (job.location.city && job.location.state) {
+        parts.push(`${job.location.city}, ${job.location.state}`);
+      } else {
+        if (job.location.city) parts.push(job.location.city);
+        if (job.location.state) parts.push(job.location.state);
+      }
+
+      // Add ZIP code if available
+      if (job.location.zip) {
+        parts.push(job.location.zip);
+      }
+
+      return parts.join(", ");
     }
 
     return "Location not specified";
@@ -299,6 +347,15 @@ export default function JobDetails() {
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Ensure user is logged in
+    if (!currentUser) {
+      toast.error("You must be logged in to apply for jobs");
+      router.push(
+        `/login?redirect=/jobs/${jobId}&job=${encodeURIComponent(job.title)}`
+      );
+      return;
+    }
 
     // Prevent reapplying if already applied
     if (hasApplied) {
@@ -325,24 +382,19 @@ export default function JobDetails() {
       setIsApplying(true);
 
       // Create application in Firestore
-      const applicationData: any = {
+      const applicationData = {
         jobId,
-        name: applicationForm.name,
-        email: applicationForm.email,
-        phone: applicationForm.phone,
-        coverLetter: applicationForm.coverLetter,
+        userId: currentUser.uid,
+        name: applicationForm.name.trim(),
+        email: applicationForm.email.trim(),
+        phone: applicationForm.phone.trim(),
+        coverLetter: applicationForm.coverLetter.trim(),
         jobTitle: job.title,
         company: job.company,
         status: "Applied",
-        isManual: !currentUser, // Set to true for guest applications
+        isManual: false,
         createdAt: serverTimestamp(),
       };
-
-      // Add user ID if authenticated
-      if (currentUser) {
-        applicationData.userId = currentUser.uid;
-        applicationData.isManual = false;
-      }
 
       await addDoc(collection(db, "applications"), applicationData);
 
@@ -353,13 +405,14 @@ export default function JobDetails() {
       setIsSubmitted(true);
       toast.success("Application submitted successfully!");
 
-      // Reset form after successful submission
+      // Reset form data completely to empty values
       setApplicationForm({
         name: "",
         email: "",
         phone: "",
         coverLetter: "",
         termsAccepted: false,
+        status: "",
       });
     } catch (err) {
       console.error("Error submitting application:", err);
@@ -392,10 +445,8 @@ export default function JobDetails() {
         return;
       }
 
-      // Delete the application document
-      const batch = await import("firebase/firestore").then((module) =>
-        module.writeBatch(db)
-      );
+      // Delete the application document(s)
+      const batch = writeBatch(db);
       querySnapshot.forEach((doc) => {
         batch.delete(doc.ref);
       });
@@ -405,6 +456,7 @@ export default function JobDetails() {
       // Update state
       setHasApplied(false);
       setIsSubmitted(false);
+      setIsRemoveDialogOpen(false);
 
       toast.success("Application removed successfully");
     } catch (err) {
@@ -473,7 +525,7 @@ export default function JobDetails() {
 
   if (loading) {
     return (
-      <MainLayout activeLink="jobs">
+      <MainLayout activeLink="jobs" showNav={true}>
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-center h-[calc(100vh-200px)]">
             <div className="text-center space-y-4">
@@ -760,69 +812,125 @@ export default function JobDetails() {
                     )}
                   </ul>
                 </div>
-
-                {job.responsibilities && job.responsibilities.length > 0 && (
-                  <>
-                    <h3>Responsibilities:</h3>
-                    <ul>
-                      {job.responsibilities.map(
-                        (item: string, index: number) => (
-                          <li key={index}>{item}</li>
-                        )
-                      )}
-                    </ul>
-                  </>
-                )}
-                {job.requirements && job.requirements.length > 0 && (
-                  <>
-                    <h3>Requirements:</h3>
-                    <ul>
-                      {job.requirements.map((item: string, index: number) => (
-                        <li key={index}>{item}</li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-                {job.benefits && job.benefits.length > 0 && (
-                  <>
-                    <h3>Benefits:</h3>
-                    <ul>
-                      {job.benefits.map((item: string, index: number) => (
-                        <li key={index}>{item}</li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-                {job.skills && job.skills.length > 0 && (
-                  <>
-                    <h3>Skills Required:</h3>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {typeof job.skills === "string"
-                        ? job.skills
-                            .split(",")
-                            .map((skill: string, index: number) => (
-                              <span
-                                key={index}
-                                className="bg-secondary px-2 py-1 rounded-full text-xs"
-                              >
-                                {skill.trim()}
-                              </span>
-                            ))
-                        : Array.isArray(job.skills)
-                        ? job.skills.map((skill: string, index: number) => (
-                            <span
-                              key={index}
-                              className="bg-secondary px-2 py-1 rounded-full text-xs"
-                            >
-                              {skill.trim()}
-                            </span>
-                          ))
-                        : null}
-                    </div>
-                  </>
-                )}
               </CardContent>
             </Card>
+
+            {/* Location Details Card - Only show for on-site jobs */}
+            {job.workLocation &&
+              (job.workLocation.toLowerCase() === "on-site" ||
+                job.workLocation.toLowerCase() === "onsite") &&
+              job.location && (
+                <Card className="mb-8">
+                  <CardHeader>
+                    <CardTitle>Location Details</CardTitle>
+                    <CardDescription>
+                      Find detailed information about the job location and
+                      directions
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-primary" />
+                      <span className="font-medium text-lg">
+                        {job.location.buildingName
+                          ? `${job.location.buildingName}, `
+                          : ""}
+                        {job.location.address}
+                      </span>
+                    </div>
+
+                    {/* Location details grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {job.location.city && (
+                        <div className="bg-muted/30 p-3 rounded-lg">
+                          <p className="text-sm text-muted-foreground">City</p>
+                          <p className="font-medium">{job.location.city}</p>
+                        </div>
+                      )}
+                      {job.location.state && (
+                        <div className="bg-muted/30 p-3 rounded-lg">
+                          <p className="text-sm text-muted-foreground">State</p>
+                          <p className="font-medium">{job.location.state}</p>
+                        </div>
+                      )}
+                      {job.location.zip && (
+                        <div className="bg-muted/30 p-3 rounded-lg">
+                          <p className="text-sm text-muted-foreground">
+                            Postal Code
+                          </p>
+                          <p className="font-medium">{job.location.zip}</p>
+                        </div>
+                      )}
+                      {job.location.buildingName && (
+                        <div className="bg-muted/30 p-3 rounded-lg">
+                          <p className="text-sm text-muted-foreground">
+                            Building
+                          </p>
+                          <p className="font-medium">
+                            {job.location.buildingName}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Map */}
+                    <div className="border rounded-lg overflow-hidden">
+                      {job.location.coordinates &&
+                      job.location.coordinates.lat &&
+                      job.location.coordinates.lng ? (
+                        <iframe
+                          title="Job Location Map"
+                          width="100%"
+                          height="350"
+                          frameBorder="0"
+                          src={`https://maps.google.com/maps?q=${job.location.coordinates.lat},${job.location.coordinates.lng}&z=15&output=embed`}
+                          allowFullScreen
+                        ></iframe>
+                      ) : job.location.address ? (
+                        <iframe
+                          title="Job Location Map"
+                          width="100%"
+                          height="350"
+                          frameBorder="0"
+                          src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                            job.location.address
+                          )}&z=15&output=embed`}
+                          allowFullScreen
+                        ></iframe>
+                      ) : (
+                        <div className="flex items-center justify-center h-[350px] bg-muted/50">
+                          <p className="text-muted-foreground">
+                            Map not available
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Get directions link */}
+                    <div className="flex justify-end">
+                      <a
+                        href={
+                          job.location.coordinates &&
+                          job.location.coordinates.lat &&
+                          job.location.coordinates.lng
+                            ? `https://www.google.com/maps/dir/?api=1&destination=${job.location.coordinates.lat},${job.location.coordinates.lng}`
+                            : job.location.address
+                            ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                                job.location.address
+                              )}`
+                            : "#"
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-primary hover:underline"
+                      >
+                        <MapPin className="h-4 w-4" />
+                        Get directions
+                      </a>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
             {job.companyDescription && (
               <Card>
@@ -866,6 +974,19 @@ export default function JobDetails() {
                       {job.applicationInstructions}
                     </p>
                   </>
+                )}
+
+                {/* Add login requirement notice */}
+                {!currentUser && (
+                  <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+                    <p className="text-amber-700 font-medium text-sm">
+                      Login Required
+                    </p>
+                    <p className="text-amber-600 text-xs mt-1">
+                      You must be logged in to apply for this job. Please login
+                      or create an account to continue.
+                    </p>
+                  </div>
                 )}
 
                 {/* Position details */}
@@ -956,29 +1077,50 @@ export default function JobDetails() {
                       ) : hasApplied ? (
                         <div className="py-6 text-center">
                           <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                            <CheckCircle className="h-6 w-6 text-primary" />
+                            {applicationForm.status === "Hired" ? (
+                              <PartyPopper className="h-6 w-6 text-primary" />
+                            ) : (
+                              <CheckCircle className="h-6 w-6 text-primary" />
+                            )}
                           </div>
                           <DialogTitle className="text-xl mb-2">
-                            Already Applied!
+                            {applicationForm.status === "Hired"
+                              ? "Congratulations! You've Been Hired!"
+                              : "Already Applied!"}
                           </DialogTitle>
                           <DialogDescription>
-                            You have already applied for {job.title} at{" "}
-                            {job.company}.
-                            <br />
-                            <br />
-                            The employer will contact you if they are interested
-                            in your application.
+                            {applicationForm.status === "Hired" ? (
+                              <>
+                                You have been hired for {job.title} at{" "}
+                                {job.company}!
+                                <br />
+                                <br />
+                                Check your dashboard for more details about
+                                starting your new role.
+                              </>
+                            ) : (
+                              <>
+                                You have already applied for {job.title} at{" "}
+                                {job.company}.
+                                <br />
+                                <br />
+                                The employer will contact you if they are
+                                interested in your application.
+                              </>
+                            )}
                           </DialogDescription>
                           <div className="mt-6 flex flex-col space-y-2">
                             <DialogClose asChild>
                               <Button variant="outline">Close</Button>
                             </DialogClose>
-                            <Button
-                              variant="destructive"
-                              onClick={() => setIsRemoveDialogOpen(true)}
-                            >
-                              Remove Application
-                            </Button>
+                            {applicationForm.status !== "Hired" && (
+                              <Button
+                                variant="destructive"
+                                onClick={() => setIsRemoveDialogOpen(true)}
+                              >
+                                Remove Application
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ) : (
@@ -994,16 +1136,16 @@ export default function JobDetails() {
                                     href={`/login?redirect=/jobs/${jobId}`}
                                     className="text-primary hover:underline"
                                   >
-                                    Sign in
-                                  </Link>{" "}
-                                  to automatically fill your details.
+                                    Login to apply
+                                  </Link>
                                 </div>
                               )}
                             </DialogDescription>
                           </DialogHeader>
+
                           <form onSubmit={handleApply}>
-                            <div className="grid gap-4 py-4">
-                              <div className="grid gap-2">
+                            <div className="space-y-4 py-4">
+                              <div>
                                 <Label htmlFor="name">Full Name</Label>
                                 <Input
                                   id="name"
@@ -1011,22 +1153,22 @@ export default function JobDetails() {
                                   value={applicationForm.name}
                                   onChange={handleChange}
                                   required
+                                  disabled={!currentUser}
                                 />
                               </div>
-                              <div className="grid gap-2">
-                                <Label htmlFor="email">
-                                  Email {currentUser ? "" : "(Optional)"}
-                                </Label>
+                              <div>
+                                <Label htmlFor="email">Email</Label>
                                 <Input
                                   id="email"
                                   name="email"
                                   type="email"
                                   value={applicationForm.email}
                                   onChange={handleChange}
-                                  required={!!currentUser}
+                                  required
+                                  disabled={!currentUser}
                                 />
                               </div>
-                              <div className="grid gap-2">
+                              <div>
                                 <Label htmlFor="phone">Phone Number</Label>
                                 <Input
                                   id="phone"
@@ -1035,37 +1177,47 @@ export default function JobDetails() {
                                   value={applicationForm.phone}
                                   onChange={handleChange}
                                   required
+                                  disabled={!currentUser}
                                 />
                               </div>
-                              <div className="grid gap-2">
+                              <div>
                                 <Label htmlFor="coverLetter">
-                                  Why are you interested in this job? (Optional)
+                                  Cover Letter (Optional)
                                 </Label>
                                 <Textarea
                                   id="coverLetter"
                                   name="coverLetter"
                                   value={applicationForm.coverLetter}
                                   onChange={handleChange}
-                                  className="min-h-[100px]"
+                                  placeholder="Tell us why you're interested in this position..."
+                                  rows={4}
+                                  disabled={!currentUser}
                                 />
                               </div>
                               <div className="flex items-center space-x-2">
                                 <Checkbox
                                   id="terms"
+                                  name="termsAccepted"
                                   checked={applicationForm.termsAccepted}
                                   onCheckedChange={handleCheckboxChange}
-                                  required
+                                  disabled={!currentUser}
                                 />
-                                <Label htmlFor="terms" className="text-sm">
-                                  I agree to be contacted about this job
-                                  opportunity
+                                <Label
+                                  htmlFor="terms"
+                                  className="text-sm font-normal"
+                                >
+                                  I confirm that the information provided is
+                                  accurate
                                 </Label>
                               </div>
                             </div>
                             <DialogFooter>
-                              <Button type="submit" disabled={isApplying}>
+                              <Button
+                                type="submit"
+                                disabled={isApplying || !currentUser}
+                              >
                                 {isApplying
-                                  ? "Submitting..."
+                                  ? "Applying..."
                                   : "Submit Application"}
                               </Button>
                             </DialogFooter>
@@ -1075,50 +1227,13 @@ export default function JobDetails() {
                     </DialogContent>
                   </Dialog>
 
-                  {hasApplied && currentUser && (
-                    <>
-                      <Button
-                        variant="destructive"
-                        className="flex-1"
-                        onClick={() => setIsRemoveDialogOpen(true)}
-                      >
-                        Remove Application
-                      </Button>
-
-                      {/* Confirmation Dialog */}
-                      <Dialog
-                        open={isRemoveDialogOpen}
-                        onOpenChange={setIsRemoveDialogOpen}
-                      >
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Confirm Removal</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to remove your application
-                              for {job.title} at {job.company}? This action
-                              cannot be undone.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <DialogFooter>
-                            <Button
-                              variant="outline"
-                              onClick={() => setIsRemoveDialogOpen(false)}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              onClick={() => {
-                                handleRemoveApplication();
-                                setIsRemoveDialogOpen(false);
-                              }}
-                            >
-                              Confirm
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </>
+                  {hasApplied && (
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push("/dashboard/job-status")}
+                    >
+                      View Status
+                    </Button>
                   )}
                 </div>
               </CardFooter>
@@ -1126,6 +1241,30 @@ export default function JobDetails() {
           </div>
         </div>
       </div>
+
+      {/* Remove Application Confirmation Dialog */}
+      <Dialog open={isRemoveDialogOpen} onOpenChange={setIsRemoveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Application</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove your application for {job.title}{" "}
+              at {job.company}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsRemoveDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveApplication}>
+              Remove Application
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

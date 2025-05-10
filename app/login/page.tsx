@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -62,6 +62,23 @@ export default function AuthPage() {
   const [countryCode, setCountryCode] = useState("91"); // Default to India
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  const [jobTitle, setJobTitle] = useState<string | null>(null);
+
+  // Get the redirect URL and job title from the query parameters
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get("redirect");
+    const job = params.get("job");
+
+    if (redirect) {
+      setRedirectUrl(redirect);
+    }
+
+    if (job) {
+      setJobTitle(job);
+    }
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,10 +97,10 @@ export default function AuthPage() {
         email,
         password
       );
-      
+
       // Check if user has admin role
       const isAdmin = await checkAdminRole(userCredential.user.uid);
-      
+
       if (isAdmin) {
         // Sign out the admin user and show error
         await auth.signOut();
@@ -97,8 +114,12 @@ export default function AuthPage() {
       // Set authentication cookie
       document.cookie = `auth=${token}; path=/; max-age=3600; secure; samesite=strict`;
 
-      // Immediate redirect after successful login
-      router.push("/");
+      // Redirect after successful login
+      if (redirectUrl) {
+        router.push(redirectUrl);
+      } else {
+        router.push("/");
+      }
     } catch (error: any) {
       setError(error.message);
       setIsLoading(false);
@@ -151,7 +172,7 @@ export default function AuthPage() {
         dateOfBirth,
         gender,
         phone,
-        role: 'job seeker', // Set default role as job seeker
+        role: "job seeker", // Set default role as job seeker
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -163,7 +184,11 @@ export default function AuthPage() {
       setShowSuccessDialog(true);
       setTimeout(() => {
         setShowSuccessDialog(false);
-        router.push("/");
+        if (redirectUrl) {
+          router.push(redirectUrl);
+        } else {
+          router.push("/");
+        }
       }, 2000);
     } catch (error: any) {
       setError(error.message);
@@ -205,7 +230,7 @@ export default function AuthPage() {
             result.user.displayName?.split(" ").slice(1).join(" ") || "",
           email: result.user.email,
           phone: result.user.phoneNumber || "",
-          role: 'job seeker', // Set default role as job seeker
+          role: "job seeker", // Set default role as job seeker
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           authProvider: "google",
@@ -221,7 +246,11 @@ export default function AuthPage() {
       setShowSuccessDialog(true);
       setTimeout(() => {
         setShowSuccessDialog(false);
-        router.push("/");
+        if (redirectUrl) {
+          router.push(redirectUrl);
+        } else {
+          router.push("/");
+        }
       }, 2000);
     } catch (error: any) {
       setError(error.message);
@@ -274,7 +303,11 @@ export default function AuthPage() {
     try {
       const credential = await signInWithPhoneNumber(auth, phoneNumber);
       await credential.confirm(otp);
-      router.push("/");
+      if (redirectUrl) {
+        router.push(redirectUrl);
+      } else {
+        router.push("/");
+      }
     } catch (error: any) {
       setError(error.message);
     } finally {
@@ -305,6 +338,20 @@ export default function AuthPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Home
         </Link>
+
+        {jobTitle && redirectUrl && redirectUrl.includes("/jobs/") && (
+          <div className="max-w-md mx-auto mb-4">
+            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+              <p className="text-blue-700 font-medium text-sm">
+                Sign in to Apply
+              </p>
+              <p className="text-blue-600 text-xs mt-1">
+                You're signing in to apply for the job:{" "}
+                <span className="font-semibold">{jobTitle}</span>
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="max-w-md mx-auto">
           <Tabs defaultValue="signin" className="w-full">

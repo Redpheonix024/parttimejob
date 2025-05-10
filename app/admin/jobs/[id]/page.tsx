@@ -15,6 +15,7 @@ import {
   Timestamp,
   updateDoc,
   addDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/app/config/firebase";
 import { format } from "date-fns";
@@ -842,6 +843,39 @@ export default function AdminJobDetail() {
         return "bg-green-500";
       default:
         return "bg-muted";
+    }
+  };
+
+  // Add a new function to handle removing applications
+  const handleRemoveApplicant = async (applicantId: string) => {
+    try {
+      // First confirm with the user
+      if (
+        !confirm(
+          "Are you sure you want to remove this applicant? This action cannot be undone."
+        )
+      ) {
+        return;
+      }
+
+      // Delete the application document from Firestore
+      const applicationRef = doc(db, "applications", applicantId);
+      await deleteDoc(applicationRef);
+
+      // Update local state to remove the applicant
+      setJobData((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          applicants: prev.applicants.filter((a) => a.id !== applicantId),
+          applications: (prev.applications || 0) - 1,
+        };
+      });
+
+      toast.success("Applicant removed successfully");
+    } catch (error) {
+      console.error("Error removing applicant:", error);
+      toast.error("Failed to remove applicant");
     }
   };
 
@@ -1900,9 +1934,14 @@ export default function AdminJobDetail() {
                                             Mark as Hired
                                           </DropdownMenuItem>
                                         )}
-                                        <DropdownMenuItem className="text-destructive">
+                                        <DropdownMenuItem
+                                          className="text-destructive"
+                                          onClick={() =>
+                                            handleRemoveApplicant(applicant.id)
+                                          }
+                                        >
                                           <Trash2 className="mr-2 h-4 w-4" />
-                                          Reject
+                                          Delete Application
                                         </DropdownMenuItem>
                                       </DropdownMenuContent>
                                     </DropdownMenu>

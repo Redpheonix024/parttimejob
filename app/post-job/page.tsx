@@ -58,6 +58,7 @@ import {
   collection,
   Timestamp,
   updateDoc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { uploadToS3 } from "@/app/utils/aws-config";
@@ -217,18 +218,54 @@ export default function PostJob() {
 
         // If user is admin and we haven't initialized the admin contact yet
         if (hasAdminRole && !adminContactInitialized) {
-          setContacts([
-            {
-              name: "Ramshad",
-              phone: "6282837529", // Default admin phone number
-            },
-          ]);
+          try {
+            // Get the admin's actual name from their profile
+            const userDoc = await getDoc(doc(db, "users", user.uid));
+            let adminName = "Admin"; // Default if no name found
+            let adminPhone = ""; // Default empty phone
+
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              // Use actual admin name if available
+              if (userData.firstName && userData.lastName) {
+                adminName = `${userData.firstName} ${userData.lastName}`.trim();
+              } else if (userData.displayName) {
+                adminName = userData.displayName;
+              } else if (user.displayName) {
+                adminName = user.displayName;
+              }
+
+              // Use admin phone if available
+              if (userData.phone) {
+                adminPhone = userData.phone;
+              } else if (user.phoneNumber) {
+                adminPhone = user.phoneNumber;
+              }
+            }
+
+            setContacts([
+              {
+                name: adminName,
+                phone: adminPhone,
+              },
+            ]);
+          } catch (error) {
+            console.error("Error fetching admin profile:", error);
+            // Fallback to generic admin contact if there's an error
+            setContacts([
+              {
+                name: "Admin",
+                phone: "",
+              },
+            ]);
+          }
+
           setAdminContactInitialized(true);
         }
       }
     };
     checkAdmin();
-  }, [user, adminContactInitialized]);
+  }, [user, adminContactInitialized, db]);
 
   // Voice recording
   const startRecording = async () => {
@@ -1785,7 +1822,7 @@ export default function PostJob() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="buildingName">
-                            Building No/House Name please fill this feild 
+                            Building No/House Name please fill this feild
                           </Label>
                           <Input
                             id="buildingName"

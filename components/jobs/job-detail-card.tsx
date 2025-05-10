@@ -1,10 +1,10 @@
-import { Badge } from "@/components/ui/badge"
-import { Briefcase, Building, Calendar, Clock, MapPin } from "lucide-react"
-import { RupeeIcon } from "@/components/ui/rupee-icon"
-import type { Job } from "@/types/job"
+import { Badge } from "@/components/ui/badge";
+import { Briefcase, Building, Calendar, Clock, MapPin } from "lucide-react";
+import { RupeeIcon } from "@/components/ui/rupee-icon";
+import type { Job } from "@/types/job";
 
 interface JobDetailCardProps {
-  job: Job
+  job: Job;
 }
 
 export default function JobDetailCard({ job }: JobDetailCardProps) {
@@ -12,25 +12,37 @@ export default function JobDetailCard({ job }: JobDetailCardProps) {
   const getLocationDisplay = () => {
     if (!job.location) return "Remote";
     if (typeof job.location === "string") return job.location;
-    
+
     // If location is an object
     if (typeof job.location === "object") {
-      // Check for display property first
-      if (job.location.display) return job.location.display;
-      
-      // Check for city and state combination
-      if (job.location.city && job.location.state) {
-        return `${job.location.city}, ${job.location.state}`;
+      const parts = [];
+
+      // Add building name if available
+      if (job.location.buildingName) {
+        parts.push(job.location.buildingName);
       }
-      
-      // Check for address
-      if (job.location.address) return job.location.address;
-      
-      // Check for individual properties
-      if (job.location.city) return job.location.city;
-      if (job.location.state) return job.location.state;
+
+      // Add address if available
+      if (job.location.address) {
+        parts.push(job.location.address);
+      }
+
+      // Add city and state
+      if (job.location.city && job.location.state) {
+        parts.push(`${job.location.city}, ${job.location.state}`);
+      } else {
+        if (job.location.city) parts.push(job.location.city);
+        if (job.location.state) parts.push(job.location.state);
+      }
+
+      // Add ZIP code if available
+      if (job.location.zip) {
+        parts.push(job.location.zip);
+      }
+
+      return parts.join(", ");
     }
-    
+
     return "Location not specified";
   };
 
@@ -66,6 +78,5 @@ export default function JobDetailCard({ job }: JobDetailCardProps) {
         <span>Posted {job.postedDate}</span>
       </div>
     </div>
-  )
+  );
 }
-

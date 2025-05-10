@@ -16,7 +16,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  distDir: '.next',
+  distDir: ".next",
   poweredByHeader: false,
   generateEtags: true,
   compress: true,
@@ -24,6 +24,15 @@ const nextConfig = {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
+  },
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      // Disable compression in development to help with HMR
+      config.optimization.minimize = false;
+      // Add HMR plugin configuration
+      config.optimization.moduleIds = "named";
+    }
+    return config;
   },
   async headers() {
     return [
