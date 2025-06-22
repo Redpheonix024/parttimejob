@@ -4,6 +4,12 @@
 
 @layer base {
   :root {
+    --font-sans: 'Poppins', sans-serif;
+  }
+}
+
+@layer base {
+  :root {
     /* Light mode */
     --background: 0 0% 100%;
     --foreground: 222 47% 11%;

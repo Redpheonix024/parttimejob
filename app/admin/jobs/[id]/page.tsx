@@ -37,24 +37,48 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
+  BadgeCheck,
+  Bell,
+  Bookmark,
   Briefcase,
   Calendar,
+  Check,
   CheckCircle,
+  CheckCheck,
+  ChevronDown,
   Clock,
+  Copy,
   DollarSign,
+  Download,
   Edit,
+  ExternalLink,
   Eye,
   FileText,
+  Filter,
+  Heart,
+  Home,
+  Info,
+  Link as LinkIcon,
+  Loader2,
+  Mail,
   MapPin,
+  Mic,
   MoreHorizontal,
+  Phone,
+  Play,
+  Plus,
+  Search,
+  Send,
+  Share2,
   Shield,
+  Star,
   Trash2,
   User,
   Users,
   Wallet,
-  Mic,
-  Play,
-  Download,
+  X,
+  X as Close,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Table,
@@ -132,6 +156,7 @@ interface JobData {
   } | null;
   applicants: {
     id: string;
+    userId?: string;
     name: string;
     email: string;
     appliedDate: string;
@@ -198,13 +223,13 @@ export default function AdminJobDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isApproving, setIsApproving] = useState(false);
-  const [isPosting, setIsPosting] = useState(false);
-  const [isAddingApplicant, setIsAddingApplicant] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAddingApplicant, setIsAddingApplicant] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<JobData['applicants'][0] | null>(null);
   const [isHiring, setIsHiring] = useState(false);
   const [isRemovingHire, setIsRemovingHire] = useState(false);
   const [isMarkingWorkFinished, setIsMarkingWorkFinished] = useState(false);
-  const [isMarkingPaymentReceived, setIsMarkingPaymentReceived] =
+  const [isMarkingPaymentReceived, setIsMarkingPaymentReceived] = useState(false);
     useState(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [selectedApplicant, setSelectedApplicant] = useState<
@@ -283,6 +308,7 @@ export default function AdminJobDetail() {
                 : null;
               return {
                 id: applicantDoc.id,
+                userId: data.userId, // Include the userId from the application
                 name:
                   userData?.firstName && userData?.lastName
                     ? `${userData.firstName} ${userData.lastName}`
@@ -1823,9 +1849,18 @@ export default function AdminJobDetail() {
                                         </AvatarFallback>
                                       </Avatar>
                                       <div>
-                                        <div className="font-medium">
+                                        <Link 
+                                          href={`/admin/users/${applicant.userId}`}
+                                          className="font-medium hover:underline cursor-pointer"
+                                          onClick={(e) => {
+                                            if (!applicant.userId || applicant.email.includes('manual-')) {
+                                              e.preventDefault();
+                                              toast.info('This applicant does not have a user profile');
+                                            }
+                                          }}
+                                        >
                                           {applicant.name}
-                                        </div>
+                                        </Link>
                                         <div className="text-xs text-muted-foreground">
                                           {applicant.email}
                                         </div>
@@ -1891,11 +1926,25 @@ export default function AdminJobDetail() {
                                         <DropdownMenuLabel>
                                           Actions
                                         </DropdownMenuLabel>
-                                        <DropdownMenuItem>
+                                        <DropdownMenuItem 
+                                          onClick={() => {
+                                            // For manual applicants, we don't have a user profile to link to
+                                            if (applicant.email.includes('manual-') || !applicant.userId) {
+                                              toast.info('This applicant does not have a user profile');
+                                              return;
+                                            }
+                                            // Use the userId from the application data
+                                            router.push(`/admin/users/${applicant.userId}`);
+                                          }}
+                                          className="cursor-pointer"
+                                        >
                                           <User className="mr-2 h-4 w-4" />
                                           View Profile
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={() => setSelectedApplication(applicant)}
+                                          className="cursor-pointer"
+                                        >
                                           <FileText className="mr-2 h-4 w-4" />
                                           View Application
                                         </DropdownMenuItem>
@@ -1995,6 +2044,116 @@ export default function AdminJobDetail() {
                   </Card>
                 </TabsContent>
               </Tabs>
+
+              {/* Application Details Dialog */}
+              <Dialog 
+                open={!!selectedApplication} 
+                onOpenChange={(open) => !open && setSelectedApplication(null)}
+              >
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                  {selectedApplication && (
+                    <>
+                      <DialogHeader>
+                        <DialogTitle>Application Details</DialogTitle>
+                        <DialogDescription>
+                          Application from {selectedApplication.name}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-6 py-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Applicant</h3>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={selectedApplication.avatar} alt={selectedApplication.name} />
+                                <AvatarFallback>{selectedApplication.name.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">{selectedApplication.name}</p>
+                                <p className="text-sm text-muted-foreground">{selectedApplication.email}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Application Status</h3>
+                            <Badge
+                              variant={
+                                selectedApplication.status === 'Hired'
+                                  ? 'default'
+                                  : selectedApplication.status === 'Rejected'
+                                  ? 'destructive'
+                                  : 'secondary'
+                              }
+                            >
+                              {selectedApplication.status}
+                            </Badge>
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Applied On</h3>
+                            <p>{selectedApplication.appliedDate}</p>
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Contact</h3>
+                            <p className="text-sm">
+                              {selectedApplication.email}
+                              {selectedApplication.phone && ` • ${selectedApplication.phone}`}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="border-t pt-4">
+                          <h3 className="text-sm font-medium text-muted-foreground mb-2">Cover Letter</h3>
+                          <div className="bg-muted/50 p-4 rounded-md">
+                            {selectedApplication.coverLetter ? (
+                              <p className="whitespace-pre-line">{selectedApplication.coverLetter}</p>
+                            ) : (
+                              <p className="text-muted-foreground text-sm">No cover letter provided</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {selectedApplication.resumeUrl && (
+                          <div className="border-t pt-4">
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Resume</h3>
+                            <a 
+                              href={selectedApplication.resumeUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center text-primary hover:underline"
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              View Resume
+                            </a>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-4 border-t">
+                        {selectedApplication.status !== 'Hired' ? (
+                          <Button
+                            onClick={() => handleHireApplicant(selectedApplication.id)}
+                            disabled={isHiring}
+                            className="flex items-center gap-2"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            {isHiring ? 'Marking as Hired...' : 'Mark as Hired'}
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleRemoveHire(selectedApplication.id)}
+                            variant="outline"
+                            disabled={isRemovingHire}
+                            className="flex items-center gap-2"
+                          >
+                            <X className="h-4 w-4" />
+                            {isRemovingHire ? 'Removing Hire...' : 'Remove Hire Status'}
+                          </Button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </DialogContent>
+              </Dialog>
 
               {/* Admin Actions */}
               <Card>

@@ -1,13 +1,15 @@
-// "use client";
-
-import type React from "react";
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Poppins } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import AuthProvider from "../components/auth/auth-provider";
 
-const inter = Inter({ subsets: ["latin"] });
+const poppins = Poppins({
+  weight: ['300', '400', '500', '600', '700'],
+  subsets: ["latin"],
+  display: 'swap',
+  variable: '--font-poppins',
+});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -57,8 +59,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+    <html lang="en" suppressHydrationWarning className={poppins.className}>
+      <body>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

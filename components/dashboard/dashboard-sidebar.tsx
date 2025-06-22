@@ -4,7 +4,7 @@ import type React from "react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   FileText,
   Home,
@@ -219,14 +219,23 @@ export default function DashboardSidebar({
 
   const sidebarContent = (isCurrentlyExpanded: boolean) => (
     <>
-      <div className="p-4 border-b relative">
+      <div className="p-4 border-b relative bg-card">
         <Link
           href="/"
-          className={`font-bold text-primary flex items-center ${
-            isCurrentlyExpanded ? "text-2xl" : "text-xs justify-center"
-          }`}
+          className="flex items-center gap-2 group"
         >
-          {/* {isCurrentlyExpanded ? "Parttimejob" : "PJ"} */}
+          <div className="p-1 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+            <img 
+              src="/icons/PTJ SVG.svg" 
+              alt="Parttimejob Logo" 
+              className="h-8 w-auto drop-shadow-md"
+            />
+          </div>
+          {isCurrentlyExpanded && (
+            <span className="text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+              Parttimejob
+            </span>
+          )}
         </Link>
 
         {!isMobile && toggleSidebar && (
@@ -321,6 +330,7 @@ export default function DashboardSidebar({
     return (
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="p-0 w-[280px]">
+          <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
           <div className="flex flex-col h-full">{sidebarContent(true)}</div>
         </SheetContent>
       </Sheet>

@@ -1981,95 +1981,97 @@ export default function PostJob() {
               </CardContent>
             </Card>
 
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Contact Information</CardTitle>
-                <CardDescription>
-                  Add contact persons for this job posting
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  {contacts.map((contact: Contact, index: number) => (
-                    <div key={index} className="flex items-center gap-4">
-                      <div className="flex-1 grid grid-cols-2 gap-4">
-                        <div>
-                          <Input
-                            id={`contact-name-${index}`}
-                            placeholder="Contact person name"
-                            required
-                            value={contact.name}
-                            onChange={(e) => {
+            {!isAdmin && (
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle>Contact Information</CardTitle>
+                  <CardDescription>
+                    Add contact persons for this job posting
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    {contacts.map((contact: Contact, index: number) => (
+                      <div key={index} className="flex items-center gap-4">
+                        <div className="flex-1 grid grid-cols-2 gap-4">
+                          <div>
+                            <Input
+                              id={`contact-name-${index}`}
+                              placeholder="Contact person name"
+                              required
+                              value={contact.name}
+                              onChange={(e) => {
+                                const newContacts = [...contacts];
+                                newContacts[index].name = e.target.value;
+                                setContacts(newContacts);
+                              }}
+                            />
+                          </div>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2">
+                              +91
+                            </span>
+                            <Input
+                              id={`contact-phone-${index}`}
+                              type="tel"
+                              className="pl-12"
+                              placeholder="Phone number"
+                              required
+                              value={contact.phone}
+                              onChange={(e) => {
+                                const newContacts = [...contacts];
+                                newContacts[index].phone = e.target.value;
+                                setContacts(newContacts);
+                              }}
+                            />
+                          </div>
+                        </div>
+                        {index > 0 && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => {
                               const newContacts = [...contacts];
-                              newContacts[index].name = e.target.value;
+                              newContacts.splice(index, 1);
                               setContacts(newContacts);
                             }}
-                          />
-                        </div>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2">
-                            +91
-                          </span>
-                          <Input
-                            id={`contact-phone-${index}`}
-                            type="tel"
-                            className="pl-12"
-                            placeholder="Phone number"
-                            required
-                            value={contact.phone}
-                            onChange={(e) => {
-                              const newContacts = [...contacts];
-                              newContacts[index].phone = e.target.value;
-                              setContacts(newContacts);
-                            }}
-                          />
-                        </div>
-                      </div>
-                      {index > 0 && (
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          onClick={() => {
-                            const newContacts = [...contacts];
-                            newContacts.splice(index, 1);
-                            setContacts(newContacts);
-                          }}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="h-4 w-4"
                           >
-                            <path d="M18 6 6 18" />
-                            <path d="m6 6 12 12" />
-                          </svg>
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="24"
+                              height="24"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-4 w-4"
+                            >
+                              <path d="M18 6 6 18" />
+                              <path d="m6 6 12 12" />
+                            </svg>
+                          </Button>
+                        )}
+                      </div>
+                    ))}
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setContacts([...contacts, { name: "", phone: "" }])
-                    }
-                    className="mt-2"
-                  >
-                    Add Another Contact
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setContacts([...contacts, { name: "", phone: "" }])
+                      }
+                      className="mt-2"
+                    >
+                      Add Another Contact
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Remove terms and conditions card for admin */}
             {!isAdmin && (

@@ -240,10 +240,12 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
 
         <main className="container mx-auto px-4 py-8">
           <div className="flex items-center gap-2 mb-6">
-            <Button variant="ghost" size="icon" asChild>
-              <Link href="/admin/users">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => router.back()}
+            >
+              <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl font-bold">User Details</h1>
           </div>

@@ -601,7 +601,36 @@ export default function JobDetails() {
             )}
           </Button>
 
-          <Button variant="ghost" size="sm" className="flex items-center gap-1">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="flex items-center gap-1"
+            onClick={async () => {
+              try {
+                const jobUrl = `${window.location.origin}/jobs/${jobId}`;
+                const shareData = {
+                  title: job.title,
+                  text: `Check out this ${job.title} position at ${job.company}`,
+                  url: jobUrl,
+                };
+
+                if (navigator.share) {
+                  // Use Web Share API if available (mobile)
+                  await navigator.share(shareData);
+                } else {
+                  // Fallback to copying to clipboard
+                  await navigator.clipboard.writeText(jobUrl);
+                  toast.success('Link copied to clipboard');
+                }
+              } catch (error) {
+                console.error('Error sharing:', error);
+                if (error instanceof Error && error.name !== 'AbortError') {
+                  // Don't show error if user cancelled the share
+                  toast.error('Failed to share. Please try again.');
+                }
+              }
+            }}
+          >
             <Share2 className="h-4 w-4" />
             <span className="hidden sm:inline">Share</span>
           </Button>
@@ -611,10 +640,7 @@ export default function JobDetails() {
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-3xl font-bold">{job.title}</h1>
-              <Button variant="outline" size="icon">
-                <Share2 className="h-4 w-4" />
-                <span className="sr-only">Share</span>
-              </Button>
+
             </div>
 
             {/* Basic job info card */}

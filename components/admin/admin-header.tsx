@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Bell, Menu } from "lucide-react";
@@ -37,13 +38,15 @@ export default function AdminHeader({
             </Button>
           </div>
           <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
-              <img 
-                src="/icons/PTJ SVG.svg" 
-                alt="Parttimejob Logo" 
-                className="h-8 w-auto drop-shadow-md"
-              />
-            </div>
+            <Link href="/" className="group">
+              <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                <img 
+                  src="/icons/PTJ SVG.svg" 
+                  alt="Parttimejob Logo" 
+                  className="h-8 w-auto drop-shadow-md"
+                />
+              </div>
+            </Link>
             <h1 className="text-xl font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
               Admin control Centre
             </h1>

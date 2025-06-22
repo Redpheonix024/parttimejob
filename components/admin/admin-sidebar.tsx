@@ -128,12 +128,10 @@ export default function AdminSidebar({
               : "md:w-20 md:translate-x-0 -translate-x-full"
           }`}
       >
-        <div className="p-4 border-b flex items-center justify-between">
+        <div className="p-4 border-b flex items-center justify-between bg-card">
           <Link
             href="/admin/dashboard"
-            className={`font-bold text-primary flex items-center ${
-              isSidebarOpen ? "text-xl" : "text-xs"
-            }`}
+            className="flex items-center gap-2 group"
             onClick={() => {
               // Close sidebar on mobile when clicking the logo
               if (window.innerWidth < 768) {
@@ -141,10 +139,17 @@ export default function AdminSidebar({
               }
             }}
           >
-            {isSidebarOpen ? (
-              "Parttimejob Admin"
-            ) : (
-              <Shield className="h-6 w-6" />
+            <div className="p-1 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <img 
+                src="/icons/PTJ SVG.svg" 
+                alt="Parttimejob Logo" 
+                className="h-8 w-auto drop-shadow-md"
+              />
+            </div>
+            {isSidebarOpen && (
+              <span className="text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                Parttimejob
+              </span>
             )}
           </Link>
           <Button

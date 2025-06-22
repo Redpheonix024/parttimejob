@@ -11,6 +11,9 @@ const config = {
   ],
   prefix: "",
   theme: {
+    fontFamily: {
+      sans: ['Poppins', 'sans-serif'],
+    },
     screens: {
       'xs': '480px',
       'sm': '640px',
