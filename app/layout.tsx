@@ -61,7 +61,6 @@ export default function RootLayout({
         >
           <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>
-        <script src="/register-sw.js" async />
       </body>
     </html>
   );

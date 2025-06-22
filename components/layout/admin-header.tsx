@@ -17,7 +17,14 @@ export default function AdminHeader({ toggleSidebar }: AdminHeaderProps) {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="flex-1 md:block text-lg font-semibold">
-            <h1 className="text-lg md:text-xl font-bold truncate max-w-[180px] md:max-w-full">Admin Dashboard</h1>
+            <div className="flex items-center gap-2">
+              <img 
+                src="/icons/PTJ SVG.svg" 
+                alt="Parttimejob Logo" 
+                className="h-8 w-auto hidden md:block"
+              />
+              <h1 className="text-lg md:text-xl font-bold truncate max-w-[180px] md:max-w-full">Admin Dashboard</h1>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 md:gap-4">

@@ -116,8 +116,13 @@ export default function AdminLogin() {
     <div className="min-h-screen bg-background">
       <header className="bg-background border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-primary">
-            Parttimejob
+          <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-primary">
+            <img 
+              src="/icons/PTJ SVG.svg" 
+              alt="Parttimejob Logo" 
+              className="h-8 w-auto"
+            />
+            <span>Parttimejob</span>
           </Link>
           <ThemeToggle />
         </div>
@@ -135,10 +140,13 @@ export default function AdminLogin() {
         <div className="max-w-md mx-auto">
           <Card>
             <CardHeader className="space-y-1">
-              <div className="flex items-center justify-center mb-4">
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Shield className="h-6 w-6 text-primary" />
-                </div>
+              <div className="flex flex-col items-center justify-center mb-4 space-y-2">
+                <img 
+                  src="/icons/PTJ SVG.svg" 
+                  alt="Parttimejob Logo" 
+                  className="h-12 w-auto"
+                />
+                <div className="h-1 w-12 bg-primary/20 rounded-full"></div>
               </div>
               <CardTitle className="text-2xl text-center">
                 Admin Login

@@ -14,13 +14,17 @@ export default function EmployerHeader({ toggleSidebar }: EmployerHeaderProps) {
   return (
     <header className="bg-background border-b sticky top-0 z-10">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center md:w-64">
+        <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSidebar}>
             <Menu className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" className="hidden md:flex" onClick={toggleSidebar}>
-            <Menu className="h-5 w-5" />
-          </Button>
+          <div className="hidden md:flex items-center gap-2">
+            <img 
+              src="/icons/PTJ SVG.svg" 
+              alt="Parttimejob Logo" 
+              className="h-8 w-auto"
+            />
+          </div>
         </div>
 
         <div className="flex-1 flex items-center justify-end md:justify-between">

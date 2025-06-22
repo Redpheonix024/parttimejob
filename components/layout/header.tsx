@@ -63,8 +63,13 @@ export default function Header({
               <Menu className="h-5 w-5" />
             </Button>
           )}
-          <Link href="/" className="text-2xl font-bold text-primary">
-            Parttimejob
+          <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-primary">
+            <img 
+              src="/icons/PTJ SVG.svg" 
+              alt="Parttimejob Logo" 
+              className="h-8 w-auto"
+            />
+            <span>Parttimejob</span>
           </Link>
         </div>
 

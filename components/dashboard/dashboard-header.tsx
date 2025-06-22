@@ -46,9 +46,14 @@ export default function DashboardHeader({
             <Menu className="h-5 w-5" />
           </Button>
         </div>
-        <h1 className="text-2xl font-bold text-primary">
-          Parttimejob-User dashboard
-        </h1>
+        <div className="flex items-center gap-2">
+          <img 
+            src="/icons/PTJ SVG.svg" 
+            alt="Parttimejob Logo" 
+            className="h-8 w-auto"
+          />
+          <h1 className="text-2xl font-bold text-primary">Dashboard</h1>
+        </div>
         <div className="flex items-center ml-auto">
           <ThemeToggle />
           {/* <Button variant="ghost" size="icon" className="mr-2 relative">
