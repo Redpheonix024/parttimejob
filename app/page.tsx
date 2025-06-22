@@ -13,6 +13,7 @@ import { Briefcase, Clock, Search } from "lucide-react";
 import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { getRelativeTime } from "@/utils/relative-time";
 
 // Define constants for job counts
 const INITIAL_JOB_LOAD = 6;
@@ -97,112 +98,115 @@ export default function Home() {
     searchQuery !== "" || locationFilter !== "anywhere" || sortBy !== "newest";
 
   useEffect(() => {
+    let isSubscribed = true;
+    let attempts = 0;
+    const maxAttempts = 3;
+
     const fetchJobs = async () => {
       try {
-        const response = await fetch("/api/jobs");
-        if (!response.ok) {
-          throw new Error("Failed to fetch jobs");
-        }
-        const data = await response.json();
-        // Format the jobs data to match our interface
-        const formattedJobs = data.jobs.map((job: any) => {
-          // Helper function to safely convert timestamp to relative time
-          const getPostedDate = (timestamp: any) => {
-            try {
-              if (!timestamp) return "Recently";
+        if (!isSubscribed) return;
 
-              let date: Date;
+        setLoading(true);
+        setError(null);
 
-              // Handle Firebase Timestamp
-              if (timestamp.seconds) {
-                date = new Date(timestamp.seconds * 1000);
-              }
-              // Handle ISO string
-              else if (typeof timestamp === "string") {
-                date = new Date(timestamp);
-              }
-              // Handle Date object
-              else if (timestamp instanceof Date) {
-                date = timestamp;
-              } else {
-                return "Recently";
-              }
+        // Construct URL with filters
+        const params = new URLSearchParams();
+        if (searchQuery) params.append("search", searchQuery);
+        if (locationFilter !== "anywhere")
+          params.append("location", locationFilter);
+        if (sortBy !== "newest") params.append("sortBy", sortBy);
 
-              if (isNaN(date.getTime())) {
-                return "Recently";
-              }
+        const url = `/api/jobs${
+          params.toString() ? `?${params.toString()}` : ""
+        }`;
+        console.log("%c[Page] Fetching jobs with URL:", "color: #2196F3", url);
 
-              const now = new Date();
-              const diffInSeconds = Math.floor(
-                (now.getTime() - date.getTime()) / 1000
-              );
-
-              if (diffInSeconds < 60) {
-                return "Just now";
-              }
-
-              const diffInMinutes = Math.floor(diffInSeconds / 60);
-              if (diffInMinutes < 60) {
-                return `${diffInMinutes} min ago`;
-              }
-
-              const diffInHours = Math.floor(diffInMinutes / 60);
-              if (diffInHours < 24) {
-                return `${diffInHours} hr ago`;
-              }
-
-              const diffInDays = Math.floor(diffInHours / 24);
-              if (diffInDays < 7) {
-                return `${diffInDays} day ago`;
-              }
-
-              const diffInWeeks = Math.floor(diffInDays / 7);
-              if (diffInWeeks < 4) {
-                return `${diffInWeeks} wk ago`;
-              }
-
-              const diffInMonths = Math.floor(diffInDays / 30);
-              if (diffInMonths < 12) {
-                return `${diffInMonths} mo ago`;
-              }
-
-              const diffInYears = Math.floor(diffInMonths / 12);
-              return `${diffInYears} yr ago`;
-            } catch (error) {
-              console.error("Error formatting date:", error);
-              return "Recently";
-            }
-          };
-
-          return {
-            ...job,
-            postedDate: getPostedDate(job.createdAt),
-            urgent: job.urgent || false,
-            // Handle location data safely
-            location: {
-              ...(job.location || {}),
-              city: job.location?.city || "",
-              state: job.location?.state || "",
-              address: job.location?.address || "",
-              zip: job.location?.zip || "",
-              coordinates: job.location?.coordinates || null,
-            },
-          };
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            "Cache-Control": "no-cache",
+          },
         });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.message || `Failed to fetch jobs: ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.message || "Failed to fetch jobs");
+        }
+
+        if (!isSubscribed) return;
+
+        // Format the jobs data to match our interface using the relative time utility
+        const formattedJobs = data.jobs.map((job: any) => ({
+          ...job,
+          postedDate: getRelativeTime(job.createdAt),
+          urgent: job.urgent || false,
+          // Handle location data safely
+          location: {
+            ...(job.location || {}),
+            city: job.location?.city || "",
+            state: job.location?.state || "",
+            address: job.location?.address || "",
+            zip: job.location?.zip || "",
+            coordinates: job.location?.coordinates || null,
+          },
+        }));
+
+        if (!isSubscribed) return;
+
+        console.log(
+          "%c[Page] Formatted jobs:",
+          "color: #4CAF50",
+          formattedJobs
+        );
         setJobs(formattedJobs);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
+        console.error("%c[Page] Error fetching jobs:", "color: #FF5252", err);
+
+        if (!isSubscribed) return;
+
+        attempts++;
+        if (attempts < maxAttempts) {
+          const retryDelay = Math.min(1000 * Math.pow(2, attempts), 5000); // Exponential backoff with 5s max
+          console.log(
+            `%c[Page] Retrying in ${retryDelay}ms... Attempt ${
+              attempts + 1
+            }/${maxAttempts}`,
+            "color: #FF9800"
+          );
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
+          return fetchJobs();
+        }
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load jobs. Please try again later."
+        );
       } finally {
-        setLoading(false);
+        if (isSubscribed) {
+          setLoading(false);
+        }
       }
     };
 
+    console.log("%c[Page] Starting job fetch effect", "color: #9C27B0");
     fetchJobs();
-  }, []);
 
+    return () => {
+      isSubscribed = false;
+    };
+  }, [searchQuery, locationFilter, sortBy]); // Added dependencies to re-fetch when filters change
   // Filter jobs based on search query and filters
   const filteredJobs = jobs
-    .filter((job) => job.status === "Active") // First filter for active jobs
     .filter((job) => {
       if (searchQuery) {
         const query = searchQuery.toLowerCase();

@@ -121,6 +121,7 @@ interface FormData {
   state: string;
   zip: string;
   buildingName: string; // Building number or house name
+  googleMapsLink: string; // Google Maps URL
 }
 
 // Dynamically import the Map component to avoid SSR issues
@@ -203,6 +204,22 @@ export default function PostJob() {
 
   // Add state for map attachment
   const [isMapAttached, setIsMapAttached] = useState(true);
+  const [showGoogleMapsLink, setShowGoogleMapsLink] = useState(false);
+
+  // Toggle map attachment and clear address fields when detaching
+  const toggleMapAttachment = useCallback(() => {
+    if (isMapAttached) {
+      // Clear address fields when detaching
+      setFormData(prev => ({
+        ...prev,
+        address: "",
+        city: "",
+        state: "",
+        zip: ""
+      }));
+    }
+    setIsMapAttached(prev => !prev);
+  }, [isMapAttached]);
 
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -414,13 +431,14 @@ export default function PostJob() {
       setLocation({ lat, lng }); // Always update marker position
 
       if (!isMapAttached) {
-        return; // Do not geocode and update form fields if map is detached
+        // If map is detached, do NOT update address fields, but keep map open
+        return;
       }
 
-      // Reverse geocode to get address
+      // Reverse geocode to get address via backend proxy
       try {
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+          `/api/geocode?type=reverse&lat=${lat}&lon=${lng}`
         );
         const data = await response.json();
 
@@ -446,15 +464,13 @@ export default function PostJob() {
       }
     },
     [isMapAttached]
-  ); // Added isMapAttached
+  ); // Only skip address update if map is detached, but do not close/hide the map
 
   // Handle address search
   const handleAddressSearch = useCallback(async (query: string) => {
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          query
-        )}&limit=1`
+        `/api/geocode?type=search&q=${encodeURIComponent(query)}`
       );
       const data = await response.json();
 
@@ -464,7 +480,7 @@ export default function PostJob() {
 
         // Get address details
         const addressResponse = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`
+          `/api/geocode?type=reverse&lat=${lat}&lon=${lon}`
         );
         const addressData = await addressResponse.json();
 
@@ -514,11 +530,10 @@ export default function PostJob() {
         });
 
         if (isMapAttached) {
-          // Check if map is attached
-          // Reverse geocode to get address
+          // Reverse geocode to get address via backend proxy
           try {
             const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
+              `/api/geocode?type=reverse&lat=${latitude}&lon=${longitude}`
             );
             const data = await response.json();
 
@@ -734,7 +749,8 @@ export default function PostJob() {
             lat: location.lat,
             lng: location.lng,
           },
-          googleMapsUrl: googleMapsUrl, // Add Google Maps URL
+          googleMapsUrl: googleMapsUrl, // Generated Google Maps URL
+          customGoogleMapsLink: formData.googleMapsLink || null, // User-provided Google Maps link
         };
       }
 
@@ -972,7 +988,11 @@ export default function PostJob() {
     }
   };
 
-  return isAdmin ? (
+  if (!isAdmin) {
+    return <div>Access Denied</div>; // or redirect to login
+  }
+
+  return (
     <AdminLayout activeLink="jobs" title="Post Job">
       {/* Google Maps Script */}
       <Script
@@ -1741,8 +1761,8 @@ export default function PostJob() {
                           onClick={() => {
                             const newAttachState = !isMapAttached;
                             setIsMapAttached(newAttachState);
-                            // If attaching the map, show it; if detaching, hide it
-                            setShowMap(newAttachState);
+                            // Keep the map visible regardless of attachment state
+                            setShowMap(true);
                           }}
                           className="flex items-center gap-2"
                         >
@@ -1805,6 +1825,37 @@ export default function PostJob() {
                         </div>
                       )}
 
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Google Maps Link (Optional)</Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowGoogleMapsLink(!showGoogleMapsLink)}
+                            className="text-xs"
+                          >
+                            {showGoogleMapsLink ? 'Hide' : 'Add Link'}
+                          </Button>
+                        </div>
+                        {showGoogleMapsLink && (
+                          <div className="space-y-2">
+                            <Input
+                              type="url"
+                              placeholder="Paste Google Maps link (e.g., https://maps.app.goo.gl/...)"
+                              value={formData.googleMapsLink || ''}
+                              onChange={(e) =>
+                                setFormData(prev => ({
+                                  ...prev,
+                                  googleMapsLink: e.target.value
+                                }))
+                              }
+                              className="text-sm"
+                            />
+                          </div>
+                        )}
+                      </div>
+
                       {showMap && (
                         <div className="border rounded-md overflow-hidden">
                           <Map
@@ -1822,7 +1873,7 @@ export default function PostJob() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="buildingName">
-                            Building No/House Name please fill this feild
+                            Building No/House Name
                           </Label>
                           <Input
                             id="buildingName"
@@ -2086,1166 +2137,6 @@ export default function PostJob() {
         </div>
       </main>
     </AdminLayout>
-  ) : (
-    <div className="min-h-screen bg-background">
-      {/* Google Maps Script */}
-      <Script
-        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
-        strategy="afterInteractive"
-      />
-
-      <header className="bg-background border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-primary">
-            Parttimejob
-          </Link>
-          <div className="flex items-center gap-4">
-            <ThemeToggle />
-            <Button variant="ghost" size="icon" className="mr-2 relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary"></span>
-            </Button>
-            <Button variant="ghost" size="icon" className="mr-2 relative">
-              <MessageSquare className="h-5 w-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary"></span>
-            </Button>
-
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Avatar className="h-8 w-8 cursor-pointer">
-                    <AvatarImage
-                      src={`${
-                        profile?.profilePicture ||
-                        profile?.photoURL ||
-                        user?.photoURL ||
-                        "/placeholder-user.jpg"
-                      }?t=${Date.now()}`}
-                      alt={profile?.firstName || user?.displayName || "User"}
-                      style={{ objectFit: "cover" }}
-                      onError={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        img.src = "/placeholder-user.jpg";
-                      }}
-                    />
-                    <AvatarFallback>
-                      {profile?.firstName?.[0]?.toUpperCase() ||
-                        user?.displayName?.[0] ||
-                        "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard">Dashboard</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/profile">Profile</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Log out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Link href="/login">
-                <Button variant="outline">Sign In</Button>
-              </Link>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-3xl mx-auto">
-          <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-3xl font-bold">Post a Job</h1>
-            {isAdmin && (
-              <span className="px-2 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full">
-                Admin
-              </span>
-            )}
-          </div>
-          <p className="text-muted-foreground mb-8">
-            Fill out the form below to post your part-time job opportunity.
-          </p>
-
-          <form onSubmit={handleSubmit}>
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Job Details</CardTitle>
-                <CardDescription>
-                  Provide the basic information about the job you're posting.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Job Title</Label>
-                  <Input
-                    id="title"
-                    placeholder="e.g. Weekend Barista, Event Photographer"
-                    required
-                    value={formData.title}
-                    onChange={handleChange}
-                    className={formErrors.title ? "border-red-500" : ""}
-                  />
-                  {formErrors.title && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {formErrors.title}
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="company">Company/Organization</Label>
-                    <Input
-                      id="company"
-                      placeholder="Your company name"
-                      required
-                      value={formData.company}
-                      onChange={handleChange}
-                      className={formErrors.company ? "border-red-500" : ""}
-                    />
-                    {formErrors.company && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.company}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="salaryType">Salary Type</Label>
-                    <Select
-                      required
-                      value={formData.salaryType}
-                      onValueChange={(value) =>
-                        handleSelectChange(value, "salaryType")
-                      }
-                    >
-                      <SelectTrigger
-                        id="salaryType"
-                        className={
-                          formErrors.salaryType ? "border-red-500" : ""
-                        }
-                      >
-                        <SelectValue placeholder="Select salary type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="hourly">Per Hour</SelectItem>
-                        <SelectItem value="daily">Per Day</SelectItem>
-                        <SelectItem value="weekly">Per Week</SelectItem>
-                        <SelectItem value="monthly">Per Month</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {formErrors.salaryType && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.salaryType}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="positions">Number of Positions</Label>
-                    <Input
-                      id="positions"
-                      type="number"
-                      min="1"
-                      step="1"
-                      placeholder="Number of people needed"
-                      required
-                      value={formData.positions}
-                      onChange={(e) => {
-                        const value = Math.abs(
-                          Math.floor(Number(e.target.value))
-                        );
-                        // Create a synthetic event object that matches the expected type
-                        const syntheticEvent = {
-                          target: { id: "positions", value: value.toString() },
-                          currentTarget: e.currentTarget,
-                          bubbles: e.bubbles,
-                          cancelable: e.cancelable,
-                          defaultPrevented: e.defaultPrevented,
-                          eventPhase: e.eventPhase,
-                          isTrusted: e.isTrusted,
-                          nativeEvent: e.nativeEvent,
-                          preventDefault: e.preventDefault,
-                          isDefaultPrevented: e.isDefaultPrevented,
-                          stopPropagation: e.stopPropagation,
-                          isPropagationStopped: e.isPropagationStopped,
-                          persist: e.persist,
-                          timeStamp: e.timeStamp,
-                          type: e.type,
-                        } as React.ChangeEvent<
-                          HTMLInputElement | HTMLTextAreaElement
-                        >;
-                        handleChange(syntheticEvent);
-                      }}
-                      className={formErrors.positions ? "border-red-500" : ""}
-                    />
-                    {formErrors.positions && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.positions}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="gender">Gender Preference</Label>
-                    <Select
-                      required
-                      value={formData.gender}
-                      onValueChange={(value) =>
-                        handleSelectChange(value, "gender")
-                      }
-                    >
-                      <SelectTrigger
-                        id="gender"
-                        className={formErrors.gender ? "border-red-500" : ""}
-                      >
-                        <SelectValue placeholder="Select gender preference" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Male Only</SelectItem>
-                        <SelectItem value="female">Female Only</SelectItem>
-                        <SelectItem value="both">Both</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {formErrors.gender && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.gender}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Age Range Required</Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label
-                          htmlFor="minAge"
-                          className="text-sm text-muted-foreground"
-                        >
-                          Minimum Age (18+)
-                        </Label>
-                        <Input
-                          id="minAge"
-                          type="number"
-                          min="18"
-                          value={formData.minAge}
-                          onChange={handleChange}
-                          className={`mt-1 ${
-                            formErrors.minAge ? "border-red-500" : ""
-                          }`}
-                          required
-                        />
-                        {formErrors.minAge && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {formErrors.minAge}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <Label
-                          htmlFor="maxAge"
-                          className="text-sm text-muted-foreground"
-                        >
-                          Maximum Age
-                        </Label>
-                        <Input
-                          id="maxAge"
-                          type="number"
-                          min="18"
-                          value={formData.maxAge}
-                          onChange={handleChange}
-                          className={`mt-1 ${
-                            formErrors.maxAge ? "border-red-500" : ""
-                          }`}
-                          required
-                        />
-                        {formErrors.maxAge && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {formErrors.maxAge}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="startDate">Job Date</Label>
-                    <Input
-                      id="startDate"
-                      type="date"
-                      required
-                      value={formData.startDate}
-                      onChange={handleChange}
-                      className={formErrors.startDate ? "border-red-500" : ""}
-                    />
-                    {formErrors.startDate && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.startDate}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="endDate">
-                      Job End Date (if applicable)
-                    </Label>
-                    <Input
-                      id="endDate"
-                      type="date"
-                      value={formData.endDate}
-                      onChange={handleChange}
-                      className={formErrors.endDate ? "border-red-500" : ""}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Leave blank for ongoing positions
-                    </p>
-                    {formErrors.endDate && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.endDate}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Job Description</CardTitle>
-                <CardDescription>
-                  Provide a detailed description of the job responsibilities and
-                  requirements.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="border rounded-md p-4 bg-muted/30">
-                    <div className="mb-4">
-                      <h4 className="text-sm font-medium mb-2">
-                        Voice Description
-                      </h4>
-                      <p className="text-xs text-muted-foreground mb-4">
-                        Record a voice description of the job (max 2 minutes).
-                        This helps applicants better understand the role.
-                      </p>
-
-                      <div className="flex items-center gap-2 mb-3">
-                        {!isRecording && !audioUrl && (
-                          <Button
-                            type="button"
-                            onClick={startRecording}
-                            className="flex items-center gap-2"
-                            variant="secondary"
-                            size="sm"
-                          >
-                            <Mic className="h-4 w-4" />
-                            Start Recording
-                          </Button>
-                        )}
-
-                        {isRecording && !isPaused && (
-                          <>
-                            <Button
-                              type="button"
-                              onClick={pauseRecording}
-                              className="flex items-center gap-2"
-                              variant="outline"
-                              size="sm"
-                            >
-                              <Pause className="h-4 w-4" />
-                              Pause
-                            </Button>
-                            <Button
-                              type="button"
-                              onClick={stopRecording}
-                              className="flex items-center gap-2"
-                              variant="destructive"
-                              size="sm"
-                            >
-                              <Square className="h-4 w-4" />
-                              Stop
-                            </Button>
-                          </>
-                        )}
-
-                        {isRecording && isPaused && (
-                          <>
-                            <Button
-                              type="button"
-                              onClick={resumeRecording}
-                              className="flex items-center gap-2"
-                              variant="outline"
-                              size="sm"
-                            >
-                              <Play className="h-4 w-4" />
-                              Resume
-                            </Button>
-                            <Button
-                              type="button"
-                              onClick={stopRecording}
-                              className="flex items-center gap-2"
-                              variant="destructive"
-                              size="sm"
-                            >
-                              <Square className="h-4 w-4" />
-                              Stop
-                            </Button>
-                          </>
-                        )}
-
-                        {audioUrl && !isRecording && (
-                          <>
-                            <div className="flex flex-col gap-3 bg-muted/50 p-4 rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <Mic className="h-4 w-4 text-primary" />
-                                  <span className="text-sm font-medium">
-                                    Voice Description
-                                  </span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatTime(recordingTime)}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                <audio
-                                  ref={audioRef}
-                                  src={audioUrl}
-                                  controls
-                                  className="flex-1 h-10 [&::-webkit-media-controls-panel]:bg-muted/50 [&::-webkit-media-controls-current-time-display]:text-xs [&::-webkit-media-controls-time-remaining-display]:text-xs"
-                                />
-                                <div className="flex gap-2">
-                                  <Button
-                                    type="button"
-                                    onClick={() => {
-                                      setAudioBlob(null);
-                                      setAudioUrl(null);
-                                      setRecordingTime(0);
-                                    }}
-                                    variant="destructive"
-                                    size="sm"
-                                    className="h-8"
-                                  >
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      width="16"
-                                      height="16"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      className="h-4 w-4"
-                                    >
-                                      <path d="M3 6h18" />
-                                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                                    </svg>
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    onClick={startRecording}
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8"
-                                  >
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      width="16"
-                                      height="16"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      className="h-4 w-4"
-                                    >
-                                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                                      <line x1="12" y1="19" x2="12" y2="22" />
-                                    </svg>
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {isRecording && (
-                        <div className="mb-2">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span>Recording {isPaused ? "(Paused)" : ""}</span>
-                            <span>
-                              {formatTime(recordingTime)} /{" "}
-                              {formatTime(MAX_RECORDING_TIME)}
-                            </span>
-                          </div>
-                          <Progress
-                            value={(recordingTime / MAX_RECORDING_TIME) * 100}
-                            className="h-2"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">
-                        Text Description
-                      </h4>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        Provide a detailed written description of the job.
-                        Include responsibilities, requirements, and any other
-                        relevant information.
-                      </p>
-                      <Textarea
-                        id="description"
-                        placeholder="Describe the responsibilities, requirements, and any other relevant details"
-                        value={formData.description}
-                        onChange={handleChange}
-                        className={`min-h-[150px] ${
-                          formErrors.description ? "border-red-500" : ""
-                        }`}
-                      />
-                      {formErrors.description && (
-                        <p className="text-red-500 text-xs mt-1">
-                          {formErrors.description}
-                        </p>
-                      )}
-                      {audioUrl && (
-                        <p className="text-xs text-amber-600 mt-1">
-                          You have provided both a voice and text description.
-                          Both will be available to applicants.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Job Category</Label>
-                    <Select
-                      required
-                      value={formData.category}
-                      onValueChange={(value) =>
-                        handleSelectChange(value, "category")
-                      }
-                    >
-                      <SelectTrigger
-                        id="category"
-                        className={formErrors.category ? "border-red-500" : ""}
-                      >
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="food-service">
-                          Food Service
-                        </SelectItem>
-                        <SelectItem value="retail">Retail</SelectItem>
-                        <SelectItem value="admin">Administrative</SelectItem>
-                        <SelectItem value="customer-service">
-                          Customer Service
-                        </SelectItem>
-                        <SelectItem value="education">Education</SelectItem>
-                        <SelectItem value="creative">
-                          Creative & Design
-                        </SelectItem>
-                        <SelectItem value="tech">Technology</SelectItem>
-                        <SelectItem value="labor">Manual Labor</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {formErrors.category && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.category}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="skills">Required Skills (Optional)</Label>
-                    <Input
-                      id="skills"
-                      placeholder="e.g. Customer service, Excel, Photography"
-                      value={formData.skills}
-                      onChange={handleChange}
-                      className={formErrors.skills ? "border-red-500" : ""}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Separate skills with commas
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Schedule & Compensation</CardTitle>
-                <CardDescription>
-                  Provide details about the work schedule and payment.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <Label>Job Type</Label>
-                  <RadioGroup
-                    defaultValue="part-time"
-                    className="flex flex-col space-y-2"
-                    value={formData.jobType}
-                    onValueChange={(value) =>
-                      handleSelectChange(value, "jobType")
-                    }
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="part-time" id="part-time" />
-                      <Label htmlFor="part-time" className="font-normal">
-                        Part-time (Regular schedule)
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="temporary" id="temporary" />
-                      <Label htmlFor="temporary" className="font-normal">
-                        Temporary/Seasonal
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="one-time" id="one-time" />
-                      <Label htmlFor="one-time" className="font-normal">
-                        One-time job
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="internship" id="internship" />
-                      <Label htmlFor="internship" className="font-normal">
-                        Internship
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="hours">Hours per Week</Label>
-                    <Select
-                      required
-                      value={formData.hours}
-                      onValueChange={(value) =>
-                        handleSelectChange(value, "hours")
-                      }
-                    >
-                      <SelectTrigger
-                        id="hours"
-                        className={formErrors.hours ? "border-red-500" : ""}
-                      >
-                        <SelectValue placeholder="Select hours" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="less-than-10">
-                          Less than 10 hours
-                        </SelectItem>
-                        <SelectItem value="unable-to-mention">
-                          Unable to mention
-                        </SelectItem>
-                        <SelectItem value="10-15">10-15 hours</SelectItem>
-                        <SelectItem value="15-20">15-20 hours</SelectItem>
-                        <SelectItem value="20-30">20-30 hours</SelectItem>
-                        <SelectItem value="flexible">Flexible hours</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {formErrors.hours && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.hours}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="duration">Duration</Label>
-                    <Select
-                      required
-                      value={formData.duration}
-                      onValueChange={(value) =>
-                        handleSelectChange(value, "duration")
-                      }
-                    >
-                      <SelectTrigger
-                        id="duration"
-                        className={formErrors.duration ? "border-red-500" : ""}
-                      >
-                        <SelectValue placeholder="Select duration" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="one-time">One-time task</SelectItem>
-                        <SelectItem value="less-than-month">
-                          Less than a month
-                        </SelectItem>
-                        <SelectItem value="1-3-months">1-3 months</SelectItem>
-                        <SelectItem value="3-6-months">3-6 months</SelectItem>
-                        <SelectItem value="6-12-months">6-12 months</SelectItem>
-                        <SelectItem value="ongoing">Ongoing</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {formErrors.duration && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.duration}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="pay-type">Pay Type</Label>
-                    <Select
-                      required
-                      value={formData.payType}
-                      onValueChange={(value) =>
-                        handleSelectChange(value, "payType")
-                      }
-                    >
-                      <SelectTrigger
-                        id="pay-type"
-                        className={formErrors.payType ? "border-red-500" : ""}
-                      >
-                        <SelectValue placeholder="Select pay type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="hourly">Hourly rate</SelectItem>
-                        <SelectItem value="fixed">Fixed price</SelectItem>
-                        <SelectItem value="commission">Commission</SelectItem>
-                        <SelectItem value="volunteer">
-                          Volunteer/Unpaid
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {formErrors.payType && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.payType}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="salaryAmount">
-                      Salary Amount (per person)
-                    </Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2">
-                        ₹
-                      </span>
-                      <Input
-                        id="salaryAmount"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        className={`pl-7 ${
-                          formErrors.salaryAmount ? "border-red-500" : ""
-                        }`}
-                        placeholder="Enter amount"
-                        required
-                        value={formData.salaryAmount}
-                        onChange={handleChange}
-                      />
-                    </div>
-                    {formErrors.salaryAmount && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {formErrors.salaryAmount}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Location & Contact</CardTitle>
-                <CardDescription>
-                  Provide location details and how applicants should contact
-                  you.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <Label>Work Location</Label>
-                  <RadioGroup
-                    defaultValue="on-site"
-                    className="flex flex-col space-y-2"
-                    value={workLocation}
-                    onValueChange={setWorkLocation}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="on-site" id="on-site" />
-                      <Label htmlFor="on-site" className="font-normal">
-                        On-site
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="remote" id="remote" />
-                      <Label htmlFor="remote" className="font-normal">
-                        Work from home
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                {workLocation === "on-site" && (
-                  <>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Label>Select Location on Map</Label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const newAttachState = !isMapAttached;
-                            setIsMapAttached(newAttachState);
-                            // If attaching the map, show it; if detaching, hide it
-                            setShowMap(newAttachState);
-                          }}
-                          className="flex items-center gap-2"
-                        >
-                          {isMapAttached ? (
-                            <>
-                              <Unlink2 className="h-4 w-4" />
-                              <span className="text-sm">Detach Map</span>
-                            </>
-                          ) : (
-                            <>
-                              <Link2 className="h-4 w-4" />
-                              <span className="text-sm">Attach Map</span>
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="flex-1 flex items-center justify-center gap-2"
-                          onClick={() => setShowMap(!showMap)}
-                        >
-                          <MapPin className="h-4 w-4" />
-                          {showMap ? "Hide Map" : "Show Map to Select Location"}
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="flex items-center justify-center gap-2"
-                          onClick={getCurrentLocation}
-                          disabled={isLoadingLocation}
-                        >
-                          {isLoadingLocation ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <MapPin className="h-4 w-4" />
-                          )}
-                          My Location
-                        </Button>
-                      </div>
-
-                      {mapError && (
-                        <div className="p-2 bg-red-50 border border-red-200 rounded-md text-red-600 text-xs">
-                          Error: {mapError}
-                          <Button
-                            type="button"
-                            variant="link"
-                            className="text-xs underline text-red-700 p-0 h-auto ml-2"
-                            onClick={() => {
-                              setMapError(null);
-                              if (showMap) {
-                                getCurrentLocation();
-                              }
-                            }}
-                          >
-                            Retry
-                          </Button>
-                        </div>
-                      )}
-
-                      {showMap && (
-                        <div className="border rounded-md overflow-hidden">
-                          <Map
-                            center={[location.lat, location.lng]}
-                            onMapClick={handleMapClick}
-                            markerPosition={[location.lat, location.lng]}
-                          />
-                          <div className="bg-muted p-2 text-xs text-muted-foreground">
-                            Click on the map or drag the marker to select your
-                            precise location
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="buildingName">
-                            Building No/House Name
-                          </Label>
-                          <Input
-                            id="buildingName"
-                            placeholder="Enter building number or house name"
-                            value={formData.buildingName}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                buildingName: e.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="address">Address</Label>
-                          <Input
-                            id="address"
-                            placeholder="Enter address to search"
-                            value={formData.address}
-                            onChange={(e) => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                address: e.target.value,
-                              }));
-                              if (isMapAttached) {
-                                handleAddressSearch(e.target.value);
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="city">City</Label>
-                          <Input
-                            id="city"
-                            placeholder="City"
-                            value={formData.city}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                city: e.target.value,
-                              }))
-                            }
-                            disabled={!isMapAttached}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="state">State/Province</Label>
-                          <Input
-                            id="state"
-                            placeholder="State"
-                            value={formData.state}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                state: e.target.value,
-                              }))
-                            }
-                            disabled={!isMapAttached}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="zip">ZIP/Postal Code</Label>
-                          <Input
-                            id="zip"
-                            placeholder="ZIP code"
-                            value={formData.zip}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                zip: e.target.value,
-                              }))
-                            }
-                            disabled={!isMapAttached}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="applicationInstructions">
-                    Application Instructions
-                  </Label>
-                  <Textarea
-                    id="applicationInstructions"
-                    placeholder="Provide any specific instructions for applicants"
-                    value={formData.applicationInstructions}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        applicationInstructions: e.target.value,
-                      }))
-                    }
-                    className={
-                      formErrors.applicationInstructions ? "border-red-500" : ""
-                    }
-                  />
-                  {formErrors.applicationInstructions && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {formErrors.applicationInstructions}
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Contact Information</CardTitle>
-                <CardDescription>
-                  Add contact persons for this job posting
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  {contacts.map((contact: Contact, index: number) => (
-                    <div key={index} className="flex items-center gap-4">
-                      <div className="flex-1 grid grid-cols-2 gap-4">
-                        <div>
-                          <Input
-                            id={`contact-name-${index}`}
-                            placeholder="Contact person name"
-                            required
-                            value={contact.name}
-                            onChange={(e) => {
-                              const newContacts = [...contacts];
-                              newContacts[index].name = e.target.value;
-                              setContacts(newContacts);
-                            }}
-                          />
-                        </div>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2">
-                            +91
-                          </span>
-                          <Input
-                            id={`contact-phone-${index}`}
-                            type="tel"
-                            className="pl-12"
-                            placeholder="Phone number"
-                            required
-                            value={contact.phone}
-                            onChange={(e) => {
-                              const newContacts = [...contacts];
-                              newContacts[index].phone = e.target.value;
-                              setContacts(newContacts);
-                            }}
-                          />
-                        </div>
-                      </div>
-                      {index > 0 && (
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          onClick={() => {
-                            const newContacts = [...contacts];
-                            newContacts.splice(index, 1);
-                            setContacts(newContacts);
-                          }}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="h-4 w-4"
-                          >
-                            <path d="M18 6 6 18" />
-                            <path d="m6 6 12 12" />
-                          </svg>
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setContacts([...contacts, { name: "", phone: "" }])
-                    }
-                    className="mt-2"
-                  >
-                    Add Another Contact
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Terms and Conditions</CardTitle>
-                <CardDescription>
-                  Please review and accept the terms and conditions before
-                  submitting
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-2">
-                    <Checkbox
-                      id="termsAccepted"
-                      checked={formData.termsAccepted}
-                      onCheckedChange={handleCheckboxChange}
-                      className={
-                        formErrors.termsAccepted ? "border-red-500" : ""
-                      }
-                    />
-                    <div className="grid gap-1.5 leading-none">
-                      <label
-                        htmlFor="termsAccepted"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Accept Terms and Conditions
-                      </label>
-                      <p className="text-sm text-muted-foreground">
-                        By checking this box, you agree to our terms and
-                        conditions
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                {formErrors.termsAccepted && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {formErrors.termsAccepted}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <CardFooter className="flex justify-end">
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full md:w-auto"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  "Submit for Review"
-                )}
-              </Button>
-            </CardFooter>
-          </form>
-        </div>
-      </main>
-    </div>
   );
 }
+

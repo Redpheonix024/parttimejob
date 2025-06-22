@@ -1128,18 +1128,19 @@ export default function JobDetails() {
                           <DialogHeader>
                             <DialogTitle>Apply for {job.title}</DialogTitle>
                             <DialogDescription>
-                              Fill out the form below to apply for this position
-                              at {job.company}.
-                              {!currentUser && (
-                                <div className="mt-2">
-                                  <Link
-                                    href={`/login?redirect=/jobs/${jobId}`}
-                                    className="text-primary hover:underline"
-                                  >
-                                    Login to apply
-                                  </Link>
-                                </div>
-                              )}
+                              <div className="space-y-2">
+                                <p>Fill out the form below to apply for this position at {job.company}.</p>
+                                {!currentUser && (
+                                  <div className="pt-2">
+                                    <Link
+                                      href={`/login?redirect=/jobs/${jobId}`}
+                                      className="text-primary hover:underline"
+                                    >
+                                      Login to apply
+                                    </Link>
+                                  </div>
+                                )}
+                              </div>
                             </DialogDescription>
                           </DialogHeader>
 

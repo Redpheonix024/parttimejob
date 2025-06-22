@@ -25,15 +25,26 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
-  webpack: (config, { dev, isServer }) => {
+  webpack: (config, { dev, isServer, webpack }) => {
     if (dev && !isServer) {
+      // Disable Fast Refresh
+      config.plugins = config.plugins.filter(
+        plugin => plugin.constructor.name !== 'ReactRefreshWebpackPlugin'
+      );
+      
       // Disable compression in development to help with HMR
       config.optimization.minimize = false;
-      // Add HMR plugin configuration
-      config.optimization.moduleIds = "named";
+      
+      // Add better HMR settings
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+        ignored: ['**/.git/**', '**/node_modules/**', '**/.next/**']
+      };
     }
     return config;
   },
+
   async headers() {
     return [
       {

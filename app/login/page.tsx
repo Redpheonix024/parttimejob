@@ -111,8 +111,10 @@ export default function AuthPage() {
 
       const token = await userCredential.user.getIdToken();
 
-      // Set authentication cookie
-      document.cookie = `auth=${token}; path=/; max-age=3600; secure; samesite=strict`;
+      // Set authentication cookie with 4-hour expiration
+      document.cookie = `auth=${token}; path=/; max-age=${
+        60 * 60 * 4
+      }; SameSite=Strict;`;
 
       // Redirect after successful login
       if (redirectUrl) {

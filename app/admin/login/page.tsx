@@ -74,9 +74,8 @@ export default function AdminLogin() {
         // User is authenticated and has admin role
         // Generate the session cookie for middleware
         const idToken = await user.getIdToken();
-        
-        // Set the admin-session cookie (this will be used by middleware)
-        document.cookie = `admin-session=${idToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict;`;
+          // Set the admin-session cookie with 4-hour expiration
+        document.cookie = `admin-session=${idToken}; path=/; max-age=${60 * 60 * 4}; SameSite=Strict;`;
         
         // Redirect to callback URL or dashboard
         router.push(callbackUrl);

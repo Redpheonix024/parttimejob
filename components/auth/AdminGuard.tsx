@@ -16,6 +16,19 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
     const redirectToLogin = () => {
       router.push("/admin/login");
     };
+
+    // Function to refresh token and update cookie
+    const refreshTokenAndCookie = async (user: any) => {
+      try {
+        const idToken = await user.getIdToken(true); // Force refresh token
+        // Set cookie with shorter expiration (4 hours) to ensure more frequent refreshes
+        document.cookie = `admin-session=${idToken}; path=/; max-age=${60 * 60 * 4}; SameSite=Strict;`;
+        return true;
+      } catch (error) {
+        console.error("Error refreshing token:", error);
+        return false;
+      }
+    };
     
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -31,11 +44,14 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
         
         if (hasAdminRole) {
           // User is authenticated and has admin role
-          setAuthState("authenticated");
-          
-          // Get the token and update the admin-session cookie
-          const idToken = await user.getIdToken(true); // Force refresh to get a new token
-          document.cookie = `admin-session=${idToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict;`;
+          // Refresh token and update cookie
+          const refreshSuccess = await refreshTokenAndCookie(user);
+          if (refreshSuccess) {
+            setAuthState("authenticated");
+          } else {
+            setAuthState("unauthenticated");
+            redirectToLogin();
+          }
         } else {
           // User is authenticated but not an admin
           setAuthState("unauthenticated");
@@ -48,7 +64,18 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
       }
     });
 
-    return () => unsubscribe();
+    // Set up periodic token refresh (every 3.5 hours)
+    const refreshInterval = setInterval(async () => {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await refreshTokenAndCookie(currentUser);
+      }
+    }, 3.5 * 60 * 60 * 1000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(refreshInterval);
+    };
   }, [router]);
 
   // While checking authentication or if unauthenticated, show loading screen
@@ -58,4 +85,4 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
 
   // User is authenticated as admin, render children
   return <>{children}</>;
-} 
+}
