@@ -63,13 +63,17 @@ export default function Header({
               <Menu className="h-5 w-5" />
             </Button>
           )}
-          <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-primary">
-            <img 
-              src="/icons/PTJ SVG.svg" 
-              alt="Parttimejob Logo" 
-              className="h-8 w-auto"
-            />
-            <span>Parttimejob</span>
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <img 
+                src="/icons/PTJ SVG.svg" 
+                alt="Parttimejob Logo" 
+                className="h-8 w-auto drop-shadow-lg"
+              />
+            </div>
+            <span className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+              Parttimejob
+            </span>
           </Link>
         </div>
 

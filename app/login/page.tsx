@@ -28,7 +28,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Github, Mail, Phone } from "lucide-react";
+import { ArrowLeft, Github, Mail, Phone, Sun, Moon } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Dialog,
   DialogContent,
@@ -317,18 +318,23 @@ export default function AuthPage() {
     }
   };
 
-  const handleDateSelect = (date: Date) => {
-    setSelectedDate(date);
-    setShowCalendar(false);
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-background border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-primary">
-            part time jobs
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <img 
+                src="/icons/PTJ SVG.svg" 
+                alt="Parttimejob Logo" 
+                className="h-8 w-auto drop-shadow-md"
+              />
+            </div>
+            <span className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+              Parttimejob
+            </span>
           </Link>
+          <ThemeToggle />
         </div>
       </header>
 

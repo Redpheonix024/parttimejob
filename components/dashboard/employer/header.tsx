@@ -18,12 +18,14 @@ export default function EmployerHeader({ toggleSidebar }: EmployerHeaderProps) {
           <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleSidebar}>
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="hidden md:flex items-center gap-2">
-            <img 
-              src="/icons/PTJ SVG.svg" 
-              alt="Parttimejob Logo" 
-              className="h-8 w-auto"
-            />
+          <div className="hidden md:flex items-center">
+            <div className="p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
+              <img 
+                src="/icons/PTJ SVG.svg" 
+                alt="Parttimejob Logo" 
+                className="h-8 w-auto drop-shadow-md"
+              />
+            </div>
           </div>
         </div>
 

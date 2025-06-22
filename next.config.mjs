@@ -1,3 +1,35 @@
+import { execSync } from 'child_process';
+import { join } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// Clear Next.js cache on server start
+const clearCache = () => {
+  try {
+    if (process.env.NODE_ENV === 'development') {
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      const projectRoot = join(__dirname, '..');
+      const cacheDir = join(projectRoot, '.next/cache');
+      
+      console.log('\x1b[36m%s\x1b[0m', 'Clearing Next.js cache...');
+      
+      // Clear .next/cache directory
+      try {
+        execSync(`rm -rf "${cacheDir}"`);
+        console.log('\x1b[32m%s\x1b[0m', '✓ Next.js cache cleared successfully');
+      } catch (error) {
+        console.warn('\x1b[33m%s\x1b[0m', '⚠ Could not clear cache directory. It might not exist yet.');
+      }
+    }
+  } catch (error) {
+    console.error('\x1b[31m%s\x1b[0m', 'Error clearing cache:', error.message);
+  }
+};
+
+// Run cache clearing
+clearCache();
+
 let userConfig = undefined;
 try {
   userConfig = await import("./v0-user-next.config");

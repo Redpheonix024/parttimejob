@@ -36,13 +36,17 @@ export default function AdminHeader({
               <Menu className="h-5 w-5" />
             </Button>
           </div>
-          <div className="flex items-center gap-2">
-            <img 
-              src="/icons/PTJ SVG.svg" 
-              alt="Parttimejob Logo" 
-              className="h-8 w-auto"
-            />
-            <h1 className="text-xl font-semibold">Admin control Centre</h1>
+          <div className="flex items-center gap-3">
+            <div className="p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
+              <img 
+                src="/icons/PTJ SVG.svg" 
+                alt="Parttimejob Logo" 
+                className="h-8 w-auto drop-shadow-md"
+              />
+            </div>
+            <h1 className="text-xl font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+              Admin control Centre
+            </h1>
           </div>
         </div>
         <div className="flex items-center gap-4">
