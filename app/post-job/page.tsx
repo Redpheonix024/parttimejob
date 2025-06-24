@@ -652,10 +652,20 @@ export default function PostJob() {
     }
 
     if (workLocation === "on-site") {
-      if (!formData.address.trim()) errors.address = "Address is required";
-      if (!formData.city.trim()) errors.city = "City is required";
-      if (!formData.state.trim()) errors.state = "State is required";
-      if (!formData.zip.trim()) errors.zip = "ZIP code is required";
+      const hasGoogleMapsLink = formData.googleMapsLink && formData.googleMapsLink.trim() !== '';
+      
+      // Only require address fields if no Google Maps link is provided
+      if (!hasGoogleMapsLink) {
+        if (!formData.address.trim()) errors.address = "Address is required";
+        if (!formData.city.trim()) errors.city = "City is required";
+        if (!formData.state.trim()) errors.state = "State is required";
+        if (!formData.zip.trim()) errors.zip = "ZIP code is required";
+      }
+      
+      // Require either address fields or Google Maps link
+      if (!hasGoogleMapsLink && !formData.address.trim() && !formData.city.trim() && !formData.state.trim() && !formData.zip.trim()) {
+        errors.googleMapsLink = "Either address details or a Google Maps link is required";
+      }
     }
 
     // If there are validation errors, show them and stop submission
@@ -736,22 +746,32 @@ export default function PostJob() {
 
       // Add location data if on-site
       if (workLocation === "on-site") {
-        // Create a Google Maps URL for the location
-        const googleMapsUrl = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
-
-        jobData.location = {
-          buildingName: formData.buildingName,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zip: formData.zip,
+        const hasGoogleMapsLink = formData.googleMapsLink && formData.googleMapsLink.trim() !== '';
+        
+        // Initialize location data
+        const locationData: any = {
+          buildingName: formData.buildingName || null,
           coordinates: {
-            lat: location.lat,
-            lng: location.lng,
+            lat: location.lat || null,
+            lng: location.lng || null,
           },
-          googleMapsUrl: googleMapsUrl, // Generated Google Maps URL
-          customGoogleMapsLink: formData.googleMapsLink || null, // User-provided Google Maps link
+          customGoogleMapsLink: hasGoogleMapsLink ? formData.googleMapsLink.trim() : null,
         };
+        
+        // Only include address fields if they exist and no Google Maps link is provided
+        if (!hasGoogleMapsLink) {
+          locationData.address = formData.address;
+          locationData.city = formData.city;
+          locationData.state = formData.state;
+          locationData.zip = formData.zip;
+          
+          // Only generate Google Maps URL from coordinates if we have them and no custom link is provided
+          if (location.lat && location.lng) {
+            locationData.googleMapsUrl = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
+          }
+        }
+        
+        jobData.location = locationData;
       }
 
       // Upload audio to S3 if exists

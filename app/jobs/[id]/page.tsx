@@ -211,6 +211,11 @@ export default function JobDetails() {
 
         // Debug logs for job data
         console.log("Full job data:", jobData);
+        
+        // Log custom Google Maps link if it exists
+        if (jobData.location?.customGoogleMapsLink) {
+          console.log("Custom Google Maps Link:", jobData.location.customGoogleMapsLink);
+        }
 
         // Enhanced data validation and formatting
         const formattedJob = {
@@ -899,48 +904,104 @@ export default function JobDetails() {
                       )}
                     </div>
 
-                    {/* Map */}
-                    <div className="border rounded-lg overflow-hidden">
-                      {job.location.coordinates &&
-                      job.location.coordinates.lat &&
-                      job.location.coordinates.lng ? (
-                        <iframe
-                          title="Job Location Map"
-                          width="100%"
-                          height="350"
-                          frameBorder="0"
-                          src={`https://maps.google.com/maps?q=${job.location.coordinates.lat},${job.location.coordinates.lng}&z=15&output=embed`}
-                          allowFullScreen
-                        ></iframe>
-                      ) : job.location.address ? (
-                        <iframe
-                          title="Job Location Map"
-                          width="100%"
-                          height="350"
-                          frameBorder="0"
-                          src={`https://maps.google.com/maps?q=${encodeURIComponent(
-                            job.location.address
-                          )}&z=15&output=embed`}
-                          allowFullScreen
-                        ></iframe>
-                      ) : (
-                        <div className="flex items-center justify-center h-[350px] bg-muted/50">
-                          <p className="text-muted-foreground">
-                            Map not available
-                          </p>
+                    {/* Map Container */}
+                    <div className="border rounded-lg overflow-hidden bg-muted/30 mb-4">
+                      <div className="h-[300px] w-full relative">
+                        {job.location?.customGoogleMapsLink ? (
+                          <div className="h-full flex flex-col items-center justify-center p-4 text-center">
+                            <MapPin className="h-12 w-12 text-primary mb-4" />
+                            <h3 className="text-lg font-medium mb-2">Location</h3>
+                            {job.location?.address && (
+                              <p className="mb-4">{job.location.address}</p>
+                            )}
+                            <a
+                              href={job.location.customGoogleMapsLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                            >
+                              <MapPin className="h-4 w-4" />
+                              View on Google Maps
+                            </a>
+                          </div>
+                        ) : job.location?.coordinates?.lat && job.location?.coordinates?.lng ? (
+                          <iframe
+                            title="Location Map"
+                            width="100%"
+                            height="100%"
+                            frameBorder="0"
+                            scrolling="no"
+                            marginHeight={0}
+                            marginWidth={0}
+                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${job.location.coordinates.lng-0.01}%2C${job.location.coordinates.lat-0.01}%2C${job.location.coordinates.lng+0.01}%2C${job.location.coordinates.lat+0.01}&layer=mapnik&marker=${job.location.coordinates.lat}%2C${job.location.coordinates.lng}`}
+                            className="border-0"
+                          />
+                        ) : job.location?.address ? (
+                          <div className="h-full flex items-center justify-center">
+                            <div className="text-center p-4">
+                              <MapPin className="h-12 w-12 text-primary mx-auto mb-3" />
+                              <p className="mb-3">{job.location.address}</p>
+                              <a
+                                href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(job.location.address)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm"
+                              >
+                                <MapPin className="h-4 w-4" />
+                                View on OpenStreetMap
+                              </a>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="h-full flex items-center justify-center">
+                            <div className="text-center p-4">
+                              <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                              <p className="text-muted-foreground">Location not available on map</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {job.location?.customGoogleMapsLink ? (
+                        <div className="p-3 bg-muted/50 text-center border-t">
+                          <a
+                            href={job.location.customGoogleMapsLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 hover:underline"
+                          >
+                            View on Google Maps
+                          </a>
+                        </div>
+                      ) : job.location?.coordinates?.lat && job.location?.coordinates?.lng && (
+                        <div className="p-3 bg-muted/50 text-center border-t">
+                          <a
+                            href={`https://www.openstreetmap.org/?mlat=${job.location.coordinates.lat}&mlon=${job.location.coordinates.lng}#map=15/${job.location.coordinates.lat}/${job.location.coordinates.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 hover:underline"
+                          >
+                            View Larger Map
+                          </a>
                         </div>
                       )}
                     </div>
 
-                    {/* Get directions link */}
-                    <div className="flex justify-end">
+                    {/* Location Details */}
+                    <div className="space-y-4">
+                      {/* Address */}
+                      {job.location?.address && (
+                        <div>
+                          <h4 className="text-sm font-medium text-muted-foreground mb-1">Address</h4>
+                          <p className="text-sm">{job.location.address}</p>
+                        </div>
+                      )}
+                      
+                      {/* Get Directions Button */}
                       <a
                         href={
-                          job.location.coordinates &&
-                          job.location.coordinates.lat &&
-                          job.location.coordinates.lng
+                          job.location?.coordinates?.lat && job.location?.coordinates?.lng
                             ? `https://www.google.com/maps/dir/?api=1&destination=${job.location.coordinates.lat},${job.location.coordinates.lng}`
-                            : job.location.address
+                            : job.location?.address
                             ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
                                 job.location.address
                               )}`
@@ -948,10 +1009,10 @@ export default function JobDetails() {
                         }
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 text-primary hover:underline"
+                        className="inline-flex items-center gap-2 text-primary hover:underline text-sm"
                       >
                         <MapPin className="h-4 w-4" />
-                        Get directions
+                        Get directions on Google Maps
                       </a>
                     </div>
                   </CardContent>

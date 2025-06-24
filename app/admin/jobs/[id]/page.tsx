@@ -124,7 +124,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { EditJobForm } from "@/app/components/admin/edit-job-form";
+
 
 // Add these interfaces at the top of the file after imports
 interface JobData {
@@ -1263,10 +1263,12 @@ export default function AdminJobDetail() {
                 )}
               </CardContent>
               <CardFooter className="flex justify-between">
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Eye className="h-4 w-4" />
-                  View Public Listing
-                </Button>
+                <Link href={`/jobs/${jobData.id}`}>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Eye className="h-4 w-4" />
+                    View Public Listing
+                  </Button>
+                </Link>
                 <Button
                   variant="outline"
                   className="flex items-center gap-2"
@@ -2457,22 +2459,8 @@ export default function AdminJobDetail() {
             </DialogContent>
           </Dialog>
 
-          {/* Edit Job Dialog */}
-          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Edit Job</DialogTitle>
-                <DialogDescription>
-                  Update the job details below. All fields marked with * are
-                  required.
-                </DialogDescription>
-              </DialogHeader>
-              <EditJobForm
-                jobData={jobData}
-                onClose={() => setIsEditDialogOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
+
+ 
         </main>
       </div>
     </div>
