@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getJobs, getUser, deleteJob, db } from '@/lib/firebase';
+import { getJobs, getUser, deleteJob } from '@/lib/firebase';
+import { db } from '@/app/config/firebase';
 import { Timestamp } from 'firebase/firestore';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 
