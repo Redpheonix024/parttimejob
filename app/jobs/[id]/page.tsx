@@ -1033,8 +1033,8 @@ export default function JobDetails() {
             )}
           </div>
 
-          <div>
-            <Card className="sticky top-8">
+          <div className="relative">
+            <Card className="sticky top-8 max-lg:fixed max-lg:bottom-0 max-lg:left-0 max-lg:right-0 max-lg:top-auto max-lg:rounded-b-none max-lg:shadow-lg max-lg:z-50 max-lg:border-t-2 max-lg:border-primary/10">
               <CardHeader>
                 <CardTitle>Apply for this Position</CardTitle>
                 <CardDescription>
@@ -1111,7 +1111,7 @@ export default function JobDetails() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="max-lg:pb-8">
                 <div className="w-full flex gap-2">
                   <Dialog>
                     <DialogTrigger asChild>
