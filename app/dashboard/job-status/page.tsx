@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import DashboardLayout from "@/components/dashboard/dashboard-layout";
 import { MapPin, Briefcase, Calendar } from "lucide-react";
 import {
@@ -42,6 +43,7 @@ interface JobStatus {
 
 export default function JobStatusPage() {
   const { user, loading: authLoading } = useAuth();
+  const { profile } = useUserProfile();
   const router = useRouter();
 
   const [selectedTab, setSelectedTab] = useState("all");
@@ -168,7 +170,7 @@ export default function JobStatusPage() {
 
   if (loading) {
     return (
-      <DashboardLayout activeRoute="job-status">
+      <DashboardLayout activeRoute="job-status" userData={profile} user={user}>
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -182,7 +184,7 @@ export default function JobStatusPage() {
   }
 
   return (
-    <DashboardLayout activeRoute="job-status">
+    <DashboardLayout activeRoute="job-status" userData={profile} user={user}>
       {error && (
         <Alert variant="destructive" className="mb-6">
           <AlertDescription>{error}</AlertDescription>

@@ -10,6 +10,7 @@ import { db, auth } from "@/app/config/firebase"
 import { onAuthStateChanged } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useUserProfile } from "@/hooks/useUserProfile"
 
 interface SavedJob {
   id: string
@@ -24,6 +25,7 @@ interface SavedJob {
 
 export default function SavedJobs() {
   const router = useRouter()
+  const { profile } = useUserProfile()
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
@@ -88,7 +90,7 @@ export default function SavedJobs() {
   }
 
   return (
-    <DashboardLayout activeRoute="saved-jobs">
+    <DashboardLayout activeRoute="saved-jobs" userData={profile} user={user}>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Saved Jobs</h1>
         <Button onClick={() => router.push('/jobs')}>Find More Jobs</Button>

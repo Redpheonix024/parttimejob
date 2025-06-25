@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/app/config/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -35,13 +37,18 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const userData = await request.json();
-    
-    // This would typically update the user in a database
-    // For now, we'll just return the user data as if it was updated
-    
+    const { id, ...fieldsToUpdate } = userData;
+
+    if (!id) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    const userDocRef = doc(db, 'users', id);
+    await updateDoc(userDocRef, fieldsToUpdate);
+
     return NextResponse.json({ 
       success: true, 
-      user: userData 
+      user: { id, ...fieldsToUpdate }
     });
   } catch (error) {
     console.error("Error updating user:", error);

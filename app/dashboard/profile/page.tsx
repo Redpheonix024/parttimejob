@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/app/config/firebase";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,8 +27,9 @@ import {
   Upload,
   Code,
   CheckSquare,
+  Calendar as CalendarIcon,
 } from "lucide-react";
-import Calendar from "react-calendar";
+import CalendarComponent from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import { uploadToS3, deleteFromS3 } from "@/app/utils/aws-config";
 import { PhoneVerificationModal } from "@/components/phone-verification-modal";
@@ -42,11 +43,15 @@ import { Upload as AWSUpload } from "@aws-sdk/lib-storage";
 import { s3Client } from "@/app/utils/aws-config";
 import { Progress as AWSUploadProgress } from "@aws-sdk/lib-storage";
 import { ProfileCompletionDialog } from "@/components/profile/profile-completion-dialog";
+import { useAuth } from "@/hooks/useAuth";
+import JobTimeline from "@/components/dashboard/job-timeline";
+import { RupeeIcon } from "@/components/ui/rupee-icon";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { usersApi } from "@/utils/api";
 
 export default function Profile() {
-  const [user, setUser] = useState<any>(null);
-  const [userData, setUserData] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user: authUser, loading: authLoading } = useAuth();
+  const { profile, loading: profileLoading, updateProfilePicture, refetchProfile } = useUserProfile();
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -57,77 +62,64 @@ export default function Profile() {
   const [phoneToVerify, setPhoneToVerify] = useState("");
   const [showProfileCompletionDialog, setShowProfileCompletionDialog] = useState(false);
   const states = getIndiaState();
-  const [selectedState, setSelectedState] = useState(
-    userData?.permanentAddress?.state || ""
-  );
+  const [selectedState, setSelectedState] = useState(profile?.permanentAddress?.state || "");
   const [districts, setDistricts] = useState<string[]>([]);
   const [showAddSkill, setShowAddSkill] = useState(false);
+  const [completedJobs, setCompletedJobs] = useState<any[]>([]);
 
   useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUser(user);
-        await fetchUserData(user.uid);
+    if (profile?.permanentAddress?.state) {
+      const stateCode = states.find((s) => s.state === profile.permanentAddress.state)?.code;
+      if (stateCode) {
+        setDistricts(getIndiaDistrict(stateCode));
+        setSelectedState(profile.permanentAddress.state);
       }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const createInitialUserData = (uid: string, user: any) => {
-    return {
-      uid,
-      email: user.email,
-      firstName: user.displayName?.split(" ")[0] || "",
-      lastName: user.displayName?.split(" ")[1] || "",
-      photoURL: user.photoURL || "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      phoneVerified: false, // Explicit initialization
-      phone: "", // Add empty phone field
-      skills: [],
-      completedWorks: [],
-    };
-  };
-
-  const fetchUserData = async (uid: string) => {
-    try {
-      const userDocRef = doc(db, "users", uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (!userDoc.exists()) {
-        const initialData = createInitialUserData(uid, user);
-        await setDoc(userDocRef, initialData);
-        setUserData(initialData);
-      } else {
-        const data = userDoc.data();
-        setUserData(data);
-
-        // Initialize districts if permanent address exists
-        if (data?.permanentAddress?.state) {
-          const stateCode = states.find(
-            (s) => s.state === data.permanentAddress.state
-          )?.code;
-          if (stateCode) {
-            setDistricts(getIndiaDistrict(stateCode));
-            setSelectedState(data.permanentAddress.state);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching/creating user data:", error);
-      toast.error("Error loading profile data");
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [profile?.permanentAddress?.state]);
+
+  useEffect(() => {
+    if (!authLoading && authUser) {
+      // Fetch all applications for the user, then filter for completed/hired in JS, and fetch jobStatus for 'hired'
+      const fetchCompletedJobs = async () => {
+        const q = query(
+          collection(db, "applications"),
+          where("userId", "==", authUser.uid)
+        );
+        const snapshot = await getDocs(q);
+        const apps = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+        // Only keep status 'hired' or 'completed'
+        const filtered = apps.filter((job) => {
+          const status = String(job.status || "").toLowerCase();
+          return status === "hired" || status === "completed";
+        });
+        // For 'hired', fetch related job status
+        const jobsWithStatus = await Promise.all(
+          filtered.map(async (job) => {
+            let jobStatus = job.status;
+            if (String(job.status).toLowerCase() === "hired" && job.jobId) {
+              try {
+                const jobDocRef = doc(db, "jobs", job.jobId);
+                const jobDocSnap = await getDoc(jobDocRef);
+                if (jobDocSnap.exists()) {
+                  jobStatus = jobDocSnap.data().status || jobStatus;
+                }
+              } catch (e) {
+                // ignore error, fallback to application status
+              }
+            }
+            return { ...job, jobStatus };
+          })
+        );
+        setCompletedJobs(jobsWithStatus);
+      };
+      fetchCompletedJobs();
+    }
+  }, [authUser, authLoading]);
 
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!authUser) return;
     setIsSaving(true);
-
     try {
       const form = e.target as HTMLFormElement;
       const getValue = (
@@ -140,14 +132,13 @@ export default function Profile() {
           | HTMLTextAreaElement;
         return element?.value || "";
       };
-
       const formData = {
+        id: authUser.uid,
         firstName: getValue("first-name"),
         lastName: getValue("last-name"),
         phone: getValue("phone").startsWith("+91")
           ? getValue("phone")
           : "+91" + getValue("phone"),
-
         permanentAddress: {
           street: getValue("permanent-address", "textarea"),
           state: getValue("state", "select"),
@@ -160,12 +151,11 @@ export default function Profile() {
         dateOfBirth: getValue("dob"),
         gender: getValue("gender", "select"),
         bio: getValue("bio", "textarea"),
-        email: user.email,
+        email: authUser.email,
         updatedAt: new Date().toISOString(),
       };
-
-      await updateDoc(doc(db, "users", user.uid), formData);
-      setUserData({ ...userData, ...formData });
+      await usersApi.updateUser(formData);
+      await refetchProfile();
       toast.success("Profile updated successfully");
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -178,8 +168,7 @@ export default function Profile() {
   const handlePhotoUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    if (!event.target.files?.[0]) return;
-
+    if (!event.target.files?.[0] || !authUser) return;
     const file = event.target.files[0];
     if (!file.type.startsWith("image/")) {
       toast.error("Please upload an image file");
@@ -189,66 +178,20 @@ export default function Profile() {
       toast.error("File size must be less than 5MB");
       return;
     }
-
     setIsUploadingPhoto(true);
     setUploadProgress(0);
     try {
       const loadingToast = toast.loading("Uploading photo...");
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const newKey = `profile-photos/${user.uid}/${Date.now()}.jpg`;
-
-      // Delete old photo if exists
-      if (userData?.photoURL) {
-        const oldPhotoKey = userData.photoURL.split(".com/").pop();
-        if (oldPhotoKey) {
-          await deleteFromS3(oldPhotoKey);
-        }
+      // Upload the file to S3 and get the image URL
+      const response = await usersApi.uploadProfilePicture(file, authUser.uid);
+      if (response.success) {
+        await updateProfilePicture(response.imageUrl);
+        setImageKey((prev) => prev + 1);
+        toast.dismiss(loadingToast);
+        toast.success("Profile photo updated successfully");
+      } else {
+        throw new Error("Failed to upload profile picture");
       }
-
-      // Create a File object from the buffer
-      const fileObj = new File([buffer], newKey, { type: file.type });
-      
-      // Upload with progress tracking
-      const upload = new AWSUpload({
-        client: s3Client,
-        params: {
-          Bucket: process.env.NEXT_PUBLIC_AWS_BUCKET_NAME!,
-          Key: newKey,
-          Body: fileObj,
-          ContentType: file.type,
-          ACL: "public-read",
-        },
-      });
-
-      upload.on("httpUploadProgress", (progress: { loaded?: number; total?: number }) => {
-        if (progress.total && progress.loaded) {
-          const percent = Math.round((progress.loaded / progress.total) * 100);
-          setUploadProgress(percent);
-        }
-      });
-
-      await upload.done();
-      const photoURL = `https://${process.env.NEXT_PUBLIC_AWS_BUCKET_NAME}.s3.ap-south-1.amazonaws.com/${newKey}`;
-
-      if (!photoURL) throw new Error("Failed to get photo URL");
-
-      const userDocRef = doc(db, "users", user.uid);
-      await updateDoc(userDocRef, {
-        photoURL,
-        profilePicture: photoURL,
-        updatedAt: new Date().toISOString(),
-      });
-
-      setUserData((prev: any) => ({
-        ...prev,
-        photoURL,
-        profilePicture: photoURL,
-        updatedAt: new Date().toISOString(),
-      }));
-
-      setImageKey((prev) => prev + 1);
-      toast.dismiss(loadingToast);
-      toast.success("Profile photo updated successfully");
     } catch (error) {
       console.error("Error updating photo:", error);
       toast.error("Failed to update profile photo");
@@ -268,13 +211,12 @@ export default function Profile() {
   };
 
   const handlePhoneVerificationSuccess = async () => {
-    if (!user) return;
+    if (!authUser) return;
     try {
-      await updateDoc(doc(db, "users", user.uid), {
+      await updateDoc(doc(db, "users", authUser.uid), {
         phoneVerified: true,
         updatedAt: new Date().toISOString(),
       });
-      setUserData({ ...userData, phoneVerified: true });
       toast.success("Phone number verified successfully");
     } catch (error) {
       console.error("Error updating phone verification status:", error);
@@ -291,14 +233,13 @@ export default function Profile() {
   };
 
   const handleAddSkill = async (newSkill: Omit<Skill, "id">) => {
-    if (!user) return;
+    if (!authUser) return;
     try {
-      const updatedSkills = [...(userData?.skills || []), newSkill];
-      await updateDoc(doc(db, "users", user.uid), {
+      const updatedSkills = [...(profile?.skills || []), newSkill];
+      await updateDoc(doc(db, "users", authUser.uid), {
         skills: updatedSkills,
         updatedAt: new Date().toISOString(),
       });
-      setUserData({ ...userData, skills: updatedSkills });
       toast.success("Skill added successfully");
     } catch (error) {
       console.error("Error adding skill:", error);
@@ -306,8 +247,8 @@ export default function Profile() {
     }
   };
 
-  const profileCompletion = userData
-    ? calculateProfileCompletion(userData)
+  const profileCompletion = profile
+    ? calculateProfileCompletion(profile)
     : { percentage: 0, sections: [] };
 
   // Show dialog when profile completion reaches 100%
@@ -317,12 +258,12 @@ export default function Profile() {
     }
   }, [profileCompletion.percentage]);
 
-  if (isLoading) {
+  if (profileLoading) {
     return <div>Loading...</div>;
   }
 
   return (
-    <DashboardLayout activeRoute="profile" userData={userData} user={user}>
+    <DashboardLayout activeRoute="profile" userData={profile} user={authUser}>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">My Profile</h1>
         <Button disabled={isSaving}>
@@ -338,11 +279,11 @@ export default function Profile() {
                 <Avatar className="h-24 w-24 mb-4" key={imageKey}>
                   <AvatarImage
                     src={
-                      userData?.photoURL
-                        ? `${userData.photoURL}?${Date.now()}`
+                      profile?.photoURL
+                        ? `${profile.photoURL}?${Date.now()}`
                         : ""
                     }
-                    alt={userData?.firstName || "User"}
+                    alt={profile?.firstName || "User"}
                     onError={(e) => {
                       const img = e.target as HTMLImageElement;
                       img.src = "/placeholder-user.jpg";
@@ -353,14 +294,14 @@ export default function Profile() {
                     className="object-cover"
                   />
                   <AvatarFallback>
-                    {userData?.firstName?.[0]?.toUpperCase() || "U"}
-                    {userData?.lastName?.[0]?.toUpperCase() || ""}
+                    {profile?.firstName?.[0]?.toUpperCase() || "U"}
+                    {profile?.lastName?.[0]?.toUpperCase() || ""}
                   </AvatarFallback>
                 </Avatar>
                 <h2 className="text-xl font-bold">
-                  {userData?.firstName
-                    ? `${userData.firstName} ${userData.lastName}`
-                    : user?.displayName || "Complete Your Profile"}
+                  {profile?.firstName
+                    ? `${profile.firstName} ${profile.lastName}`
+                    : authUser?.displayName || "Complete Your Profile"}
                 </h2>
                 <Button
                   variant="outline"
@@ -454,8 +395,8 @@ export default function Profile() {
                         <Input
                           id="first-name"
                           defaultValue={
-                            userData?.firstName ||
-                            user?.displayName?.split(" ")[0]
+                            profile?.firstName ||
+                            authUser?.displayName?.split(" ")[0]
                           }
                         />
                       </div>
@@ -464,8 +405,8 @@ export default function Profile() {
                         <Input
                           id="last-name"
                           defaultValue={
-                            userData?.lastName ||
-                            user?.displayName?.split(" ")[1]
+                            profile?.lastName ||
+                            authUser?.displayName?.split(" ")[1]
                           }
                         />
                       </div>
@@ -476,7 +417,7 @@ export default function Profile() {
                       <Input
                         id="email"
                         type="email"
-                        defaultValue={userData?.email || user?.email}
+                        defaultValue={profile?.email || authUser?.email}
                         disabled
                       />
                     </div>
@@ -487,31 +428,9 @@ export default function Profile() {
                         <Input
                           id="phone"
                           type="tel"
-                          defaultValue={userData?.phone || "+91"}
-                          className={
-                            userData?.phoneVerified ? "border-green-500" : ""
-                          }
+                          defaultValue={profile?.phone || "+91"}
+                          className={profile?.phoneVerified ? "border-green-500" : ""}
                         />
-                        <Button
-                          type="button"
-                          variant={
-                            userData?.phoneVerified ? "outline" : "default"
-                          }
-                          onClick={() =>
-                            handlePhoneSubmit(
-                              (
-                                document.getElementById(
-                                  "phone"
-                                ) as HTMLInputElement
-                              ).value
-                            )
-                          }
-                          className={
-                            userData?.phoneVerified ? "text-green-500" : ""
-                          }
-                        >
-                          {userData?.phoneVerified ? "Verified ✓" : "Verify"}
-                        </Button>
                       </div>
                     </div>
 
@@ -525,7 +444,7 @@ export default function Profile() {
                           id="permanent-address"
                           className="min-h-[80px]"
                           defaultValue={
-                            userData?.permanentAddress?.street || ""
+                            profile?.permanentAddress?.street || ""
                           }
                           placeholder="Enter your street address"
                         />
@@ -538,7 +457,7 @@ export default function Profile() {
                             id="state"
                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
                             defaultValue={
-                              userData?.permanentAddress?.state || ""
+                              profile?.permanentAddress?.state || ""
                             }
                             onChange={handleStateChange}
                           >
@@ -556,7 +475,7 @@ export default function Profile() {
                             id="district"
                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
                             defaultValue={
-                              userData?.permanentAddress?.district || ""
+                              profile?.permanentAddress?.district || ""
                             }
                             disabled={districts.length === 0}
                           >
@@ -575,7 +494,7 @@ export default function Profile() {
                             type="text"
                             maxLength={6}
                             defaultValue={
-                              userData?.permanentAddress?.pincode || ""
+                              profile?.permanentAddress?.pincode || ""
                             }
                             placeholder="Enter pincode"
                           />
@@ -594,12 +513,12 @@ export default function Profile() {
                           value={
                             selectedDate
                               ? selectedDate.toLocaleDateString()
-                              : userData?.dateOfBirth || ""
+                              : profile?.dateOfBirth || ""
                           }
                         />
                         {showCalendar && (
                           <div className="absolute z-50 mt-1">
-                            <Calendar
+                            <CalendarComponent
                               onChange={(date) => {
                                 setSelectedDate(date as Date);
                                 setShowCalendar(false);
@@ -614,7 +533,7 @@ export default function Profile() {
                         <select
                           id="gender"
                           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
-                          defaultValue={userData?.gender || ""}
+                          defaultValue={profile?.gender || ""}
                         >
                           <option value="">Select Gender</option>
                           <option value="male">Male</option>
@@ -631,7 +550,7 @@ export default function Profile() {
                       <Textarea
                         id="bio"
                         className="min-h-[120px]"
-                        defaultValue={userData?.bio || ""}
+                        defaultValue={profile?.bio || ""}
                       />
                     </div>
 
@@ -642,7 +561,7 @@ export default function Profile() {
                           <Label htmlFor="current-city">City</Label>
                           <Input
                             id="current-city"
-                            defaultValue={userData?.currentLocation?.city || ""}
+                            defaultValue={profile?.currentLocation?.city || ""}
                             placeholder="Enter your current city"
                           />
                         </div>
@@ -677,7 +596,7 @@ export default function Profile() {
                 <CardContent>
                   <div className="space-y-6">
                     {Object.values(SkillCategory).map((category) => {
-                      const categorySkills = userData?.skills?.filter(
+                      const categorySkills = profile?.skills?.filter(
                         (skill: Skill) => skill.category === category
                       );
 
@@ -737,43 +656,69 @@ export default function Profile() {
                     <div>
                       <CardTitle>Completed Works</CardTitle>
                       <CardDescription>
-                        Add your previously completed projects and works
+                        These are jobs you have completed through the platform
                       </CardDescription>
                     </div>
-                    <Button size="sm">
-                      <CheckSquare className="h-4 w-4 mr-2" />
-                      Add Work
-                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-6">
-                    {userData?.completedWorks?.map(
-                      (work: any, index: number) => (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {completedJobs.length === 0 && (
+                      <div className="col-span-full text-center py-12 text-muted-foreground">No completed jobs yet.</div>
+                    )}
+                    {completedJobs.map((job, index) => {
+                      const jobStatus = job.jobStatus || job.status;
+                      const isPaid = String(jobStatus).toLowerCase() === "payment received";
+                      return (
                         <div
                           key={index}
-                          className="border-b pb-6 last:border-0 last:pb-0"
+                          className="bg-card border rounded-lg p-4"
                         >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-medium">{work.title}</h3>
-                              <p className="text-sm text-muted-foreground">
-                                {work.client}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {work.completionDate}
-                              </p>
+                          <h3 className="font-medium">{job.jobTitle || job.title || "Untitled Job"}</h3>
+                          <p className="text-sm text-muted-foreground">{job.company || "Unknown Company"}</p>
+                          <div className="mt-4 flex items-center justify-between">
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <CalendarIcon className="h-4 w-4 mr-2" />
+                              <span>
+                                Applied {job.appliedDate || (job.createdAt?.seconds ? new Date(job.createdAt.seconds * 1000).toLocaleDateString() : "")}
+                              </span>
                             </div>
-                            <Button variant="ghost" size="sm">
-                              Edit
-                            </Button>
+                            <div className="flex items-center">
+                              <span className="text-sm font-medium capitalize">
+                                {jobStatus}
+                              </span>
+                            </div>
                           </div>
-                          {work.description && (
-                            <p className="text-sm mt-2">{work.description}</p>
+                          {/* Paid badge */}
+                          {isPaid && (
+                            <span className="ml-2" title="Paid">
+                              <svg width="32" height="32" viewBox="0 0 512 512" fill="none">
+                                <circle cx="256" cy="256" r="256" fill="#C6F6D5"/>
+                                <circle cx="256" cy="256" r="208" fill="#fff" stroke="#38A169" strokeWidth="16"/>
+                                <path d="M160 256l64 64 128-128" stroke="#38A169" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                                <text
+                                  x="50%"
+                                  y="60%"
+                                  textAnchor="middle"
+                                  fill="#222"
+                                  fontSize="96"
+                                  fontWeight="bold"
+                                  fontFamily="Arial, sans-serif"
+                                  dy=".3em"
+                                >PAID</text>
+                              </svg>
+                            </span>
                           )}
                         </div>
-                      )
-                    )}
+                      );
+                    })}
+                    {/* Payment warning if any completed job is not paid */}
+                    {completedJobs.length > 0 &&
+                      completedJobs.filter(job => String((job.jobStatus || job.status)).toLowerCase() !== "payment received").length > 0 && (
+                        <div className="col-span-full text-center py-4">
+                          <p className="text-warning-foreground">Payment not received for some completed jobs.</p>
+                        </div>
+                      )}
                   </div>
                 </CardContent>
               </Card>
@@ -781,12 +726,12 @@ export default function Profile() {
           </Tabs>
         </div>
       </div>
-      <PhoneVerificationModal
+      {/* <PhoneVerificationModal
         isOpen={showPhoneVerification}
         onClose={() => setShowPhoneVerification(false)}
         phone={phoneToVerify}
         onVerificationSuccess={handlePhoneVerificationSuccess}
-      />
+      /> */}
       <AddSkillDialog
         isOpen={showAddSkill}
         onClose={() => setShowAddSkill(false)}

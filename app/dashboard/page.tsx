@@ -263,7 +263,7 @@ export default function Dashboard() {
       />
       <div className="space-y-6">
         <h2 className="text-3xl font-semibold text-primary">
-          Welcome back, {user?.displayName || "User"}!
+          Welcome back, {profile?.firstName || user?.displayName || "User"}!
         </h2>
 
         <div className="flex items-center justify-between">
@@ -355,7 +355,8 @@ export default function Dashboard() {
                         src={
                           profile?.profilePicture ||
                           profile?.photoURL ||
-                          getProfilePicture()
+                          user?.photoURL ||
+                          "/placeholder-user.jpg"
                         }
                         alt={user?.displayName || "User"}
                       />

@@ -134,7 +134,12 @@ export default function EmployerDashboard() {
                   <div className="relative group">
                     <Avatar className="h-16 w-16">
                       <AvatarImage
-                        src={profile?.profilePicture || profile?.photoURL || getProfilePicture()}
+                        src={
+                          profile?.profilePicture ||
+                          profile?.photoURL ||
+                          user?.photoURL ||
+                          "/placeholder-user.jpg"
+                        }
                         alt={user?.displayName || "Company"}
                       />
                       <AvatarFallback>

@@ -43,12 +43,14 @@ export function useUserProfile() {
       setLoading(true);
       const updatedProfile = await usersApi.updateUser({
         id: user.uid,
-        profilePicture: imageUrl
+        profilePicture: imageUrl,
+        photoURL: imageUrl,
       });
       
       setProfile((prev: any) => ({
         ...prev,
-        profilePicture: imageUrl
+        profilePicture: imageUrl,
+        photoURL: imageUrl,
       }));
       
       return updatedProfile;
@@ -76,11 +78,19 @@ export function useUserProfile() {
     return "/placeholder.svg?height=64&width=64";
   };
 
+  // Expose a method to manually refetch the profile
+  const refetchProfile = async () => {
+    if (user?.uid) {
+      await fetchUserProfile(user.uid);
+    }
+  };
+
   return {
     profile,
     loading,
     error,
     updateProfilePicture,
-    getProfilePicture
+    getProfilePicture,
+    refetchProfile,
   };
 } 

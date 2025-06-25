@@ -305,19 +305,25 @@ export default function DashboardSidebar({
               src={
                 userData?.profilePicture ||
                 userData?.photoURL ||
-                "/placeholder.svg?height=32&width=32"
+                user?.photoURL ||
+                "/placeholder-user.jpg"
               }
-              alt={user?.displayName || "User"}
+              alt={userData?.firstName || user?.displayName || "User"}
+              style={{ objectFit: "cover" }}
             />
-            <AvatarFallback>{user?.displayName?.[0] || "U"}</AvatarFallback>
+            <AvatarFallback>
+              {userData?.firstName?.[0]?.toUpperCase() ||
+                user?.displayName?.[0] ||
+                "U"}
+            </AvatarFallback>
           </Avatar>
           {isCurrentlyExpanded && (
             <div className="ml-3">
               <p className="text-sm font-medium">
-                {user?.displayName || "Complete Profile"}
+                {userData?.firstName || user?.displayName || "Complete Profile"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {user?.email || "Add your details"}
+                {userData?.email || user?.email || "Add your details"}
               </p>
             </div>
           )}

@@ -23,6 +23,7 @@ import {
 import { db } from "@/app/config/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface Application {
   id: string;
@@ -57,6 +58,7 @@ interface ApplicationData {
 
 export default function Applications() {
   const { user } = useAuth();
+  const { profile } = useUserProfile();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -158,7 +160,7 @@ export default function Applications() {
   };
 
   return (
-    <DashboardLayout activeRoute="applications" userData={user} user={user}>
+    <DashboardLayout activeRoute="applications" userData={profile} user={user}>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">My Applications</h1>
         <Button>Find More Jobs</Button>
