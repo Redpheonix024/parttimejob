@@ -298,7 +298,7 @@ export default function Home() {
             <div className="text-center py-8 text-red-500">{error}</div>
           ) : jobsToDisplay.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No jobs found matching your criteria.
+              We do not have any current opportunities.
             </div>
           ) : (
             <>
