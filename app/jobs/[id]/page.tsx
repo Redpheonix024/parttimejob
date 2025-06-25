@@ -55,13 +55,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useSSERefresh } from "@/hooks/useSSERefresh";
 
 // Public page - no authentication required
 export default function JobDetails() {
   const params = useParams();
   const router = useRouter();
   const jobId = params.id as string;
-
+  useSSERefresh();
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

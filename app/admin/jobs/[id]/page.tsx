@@ -236,7 +236,7 @@ export default function AdminJobDetail() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAddingApplicant, setIsAddingApplicant] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<
-    JobData["applicants"][0] | null
+    (JobData["applicants"][0] & { coverLetter?: string; resumeUrl?: string }) | null
   >(null);
   const [isHiring, setIsHiring] = useState(false);
   const [isRemovingHire, setIsRemovingHire] = useState(false);
@@ -255,6 +255,7 @@ export default function AdminJobDetail() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
 
   const form = useForm<ManualApplicantFormValues>({
     resolver: zodResolver(manualApplicantSchema),
@@ -277,6 +278,16 @@ export default function AdminJobDetail() {
         }
 
         const job = jobDoc.data();
+
+        // Automatically update status if it is 'Payment Received'
+        if (job.status === "Payment Received") {
+          const jobRef = doc(db, "jobs", params.id as string);
+          await updateDoc(jobRef, {
+            status: "Payment Distributed",
+            updatedAt: new Date(),
+          });
+          job.status = "Payment Distributed";
+        }
 
         // Fetch employer data if available
         let employer = null;
@@ -367,8 +378,8 @@ export default function AdminJobDetail() {
           applications: applicants.length,
           views: job.views || 0,
           description: job.description || "",
-          requirements: job.requirements || [],
-          benefits: job.benefits || [],
+          requirements: Array.isArray(job.requirements) ? job.requirements : [],
+          benefits: Array.isArray(job.benefits) ? job.benefits : [],
           employer: employer
             ? {
                 id: employer.uid,

@@ -139,6 +139,7 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Recent Activity */}
+        {/*
         <Card className="lg:col-span-2 relative">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -185,8 +186,10 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+        */}
 
         {/* Quick Stats */}
+        {/*
         <Card className="relative">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -200,106 +203,38 @@ export default function AdminDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="users">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="users">Users</TabsTrigger>
-                <TabsTrigger value="jobs">Jobs</TabsTrigger>
-              </TabsList>
-              <TabsContent value="users" className="pt-4">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">New Users</p>
-                      <p className="text-2xl font-bold">127</p>
-                    </div>
-                    <PieChart className="h-10 w-10 text-primary opacity-80" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Job Seekers</span>
-                      <span className="font-medium">78%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary"
-                        style={{ width: "78%" }}
-                      ></div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Employers</span>
-                      <span className="font-medium">22%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary"
-                        style={{ width: "22%" }}
-                      ></div>
-                    </div>
-                  </div>
-                  <div className="pt-2">
-                    <Button variant="outline" size="sm" className="w-full">
-                      View User Report
-                    </Button>
-                  </div>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-3">
+                <BarChart3 className="h-6 w-6 text-primary" />
+                <div>
+                  <p className="font-medium">User Growth</p>
+                  <p className="text-xs text-muted-foreground">
+                    +12% this month
+                  </p>
                 </div>
-              </TabsContent>
-              <TabsContent value="jobs" className="pt-4">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">New Jobs</p>
-                      <p className="text-2xl font-bold">43</p>
-                    </div>
-                    <Briefcase className="h-10 w-10 text-primary opacity-80" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Remote</span>
-                      <span className="font-medium">45%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary"
-                        style={{ width: "45%" }}
-                      ></div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>On-site</span>
-                      <span className="font-medium">35%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary"
-                        style={{ width: "35%" }}
-                      ></div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Hybrid</span>
-                      <span className="font-medium">20%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary"
-                        style={{ width: "20%" }}
-                      ></div>
-                    </div>
-                  </div>
-                  <div className="pt-2">
-                    <Button variant="outline" size="sm" className="w-full">
-                      View Jobs Report
-                    </Button>
-                  </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <PieChart className="h-6 w-6 text-primary" />
+                <div>
+                  <p className="font-medium">Job Distribution</p>
+                  <p className="text-xs text-muted-foreground">
+                    40% part-time, 60% full-time
+                  </p>
                 </div>
-              </TabsContent>
-            </Tabs>
+              </div>
+              <div className="flex items-center gap-3">
+                <DollarSign className="h-6 w-6 text-primary" />
+                <div>
+                  <p className="font-medium">Revenue</p>
+                  <p className="text-xs text-muted-foreground">
+                    ₹1,20,000 this month
+                  </p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
+        */}
       </div>
     </AdminLayout>
   );
