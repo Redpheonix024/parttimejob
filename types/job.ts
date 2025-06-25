@@ -36,7 +36,7 @@ export interface Job {
 }
 
 export interface JobStatus extends Job {
-  status: "applied" | "approved" | "in-progress" | "completed" | "paid";
+  status: "applied" | "approved" | "hired" | "completed" | "paid";
   appliedDate: string;
   approvedDate?: string;
   startDate?: string;

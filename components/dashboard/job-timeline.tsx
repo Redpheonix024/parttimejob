@@ -3,7 +3,7 @@ import { CheckCircle2, Clock, FileText, Briefcase } from "lucide-react"
 import { RupeeIcon } from "@/components/ui/rupee-icon"
 
 interface JobTimelineProps {
-  status: "applied" | "approved" | "in-progress" | "completed" | "paid"
+  status: "applied" | "approved" | "hired" | "completed" | "paid"
   dates?: {
     applied?: string
     approved?: string
@@ -20,21 +20,21 @@ export default function JobTimeline({ status, dates }: JobTimelineProps) {
       label: "Applied",
       icon: <FileText className="h-5 w-5" />,
       date: dates?.applied,
-      completed: ["applied", "approved", "in-progress", "completed", "paid"].includes(status),
+      completed: ["applied", "approved", "hired", "completed", "paid"].includes(status),
     },
     {
       key: "approved",
       label: "Approved",
       icon: <CheckCircle2 className="h-5 w-5" />,
       date: dates?.approved,
-      completed: ["approved", "in-progress", "completed", "paid"].includes(status),
+      completed: ["approved", "hired", "completed", "paid"].includes(status),
     },
     {
-      key: "in-progress",
-      label: "In Progress",
+      key: "hired",
+      label: "Hired",
       icon: <Briefcase className="h-5 w-5" />,
       date: dates?.started,
-      completed: ["in-progress", "completed", "paid"].includes(status),
+      completed: ["hired", "completed", "paid"].includes(status),
     },
     {
       key: "completed",

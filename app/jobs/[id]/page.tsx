@@ -211,10 +211,13 @@ export default function JobDetails() {
 
         // Debug logs for job data
         console.log("Full job data:", jobData);
-        
+
         // Log custom Google Maps link if it exists
         if (jobData.location?.customGoogleMapsLink) {
-          console.log("Custom Google Maps Link:", jobData.location.customGoogleMapsLink);
+          console.log(
+            "Custom Google Maps Link:",
+            jobData.location.customGoogleMapsLink
+          );
         }
 
         // Enhanced data validation and formatting
@@ -606,9 +609,9 @@ export default function JobDetails() {
             )}
           </Button>
 
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             className="flex items-center gap-1"
             onClick={async () => {
               try {
@@ -625,13 +628,13 @@ export default function JobDetails() {
                 } else {
                   // Fallback to copying to clipboard
                   await navigator.clipboard.writeText(jobUrl);
-                  toast.success('Link copied to clipboard');
+                  toast.success("Link copied to clipboard");
                 }
               } catch (error) {
-                console.error('Error sharing:', error);
-                if (error instanceof Error && error.name !== 'AbortError') {
+                console.error("Error sharing:", error);
+                if (error instanceof Error && error.name !== "AbortError") {
                   // Don't show error if user cancelled the share
-                  toast.error('Failed to share. Please try again.');
+                  toast.error("Failed to share. Please try again.");
                 }
               }
             }}
@@ -645,7 +648,6 @@ export default function JobDetails() {
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-3xl font-bold">{job.title}</h1>
-
             </div>
 
             {/* Basic job info card */}
@@ -910,7 +912,9 @@ export default function JobDetails() {
                         {job.location?.customGoogleMapsLink ? (
                           <div className="h-full flex flex-col items-center justify-center p-4 text-center">
                             <MapPin className="h-12 w-12 text-primary mb-4" />
-                            <h3 className="text-lg font-medium mb-2">Location</h3>
+                            <h3 className="text-lg font-medium mb-2">
+                              Location
+                            </h3>
                             {job.location?.address && (
                               <p className="mb-4">{job.location.address}</p>
                             )}
@@ -924,7 +928,8 @@ export default function JobDetails() {
                               View on Google Maps
                             </a>
                           </div>
-                        ) : job.location?.coordinates?.lat && job.location?.coordinates?.lng ? (
+                        ) : job.location?.coordinates?.lat &&
+                          job.location?.coordinates?.lng ? (
                           <iframe
                             title="Location Map"
                             width="100%"
@@ -933,7 +938,15 @@ export default function JobDetails() {
                             scrolling="no"
                             marginHeight={0}
                             marginWidth={0}
-                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${job.location.coordinates.lng-0.01}%2C${job.location.coordinates.lat-0.01}%2C${job.location.coordinates.lng+0.01}%2C${job.location.coordinates.lat+0.01}&layer=mapnik&marker=${job.location.coordinates.lat}%2C${job.location.coordinates.lng}`}
+                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${
+                              job.location.coordinates.lng - 0.01
+                            }%2C${job.location.coordinates.lat - 0.01}%2C${
+                              job.location.coordinates.lng + 0.01
+                            }%2C${
+                              job.location.coordinates.lat + 0.01
+                            }&layer=mapnik&marker=${
+                              job.location.coordinates.lat
+                            }%2C${job.location.coordinates.lng}`}
                             className="border-0"
                           />
                         ) : job.location?.address ? (
@@ -942,7 +955,9 @@ export default function JobDetails() {
                               <MapPin className="h-12 w-12 text-primary mx-auto mb-3" />
                               <p className="mb-3">{job.location.address}</p>
                               <a
-                                href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(job.location.address)}`}
+                                href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(
+                                  job.location.address
+                                )}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm"
@@ -956,7 +971,9 @@ export default function JobDetails() {
                           <div className="h-full flex items-center justify-center">
                             <div className="text-center p-4">
                               <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                              <p className="text-muted-foreground">Location not available on map</p>
+                              <p className="text-muted-foreground">
+                                Location not available on map
+                              </p>
                             </div>
                           </div>
                         )}
@@ -972,17 +989,20 @@ export default function JobDetails() {
                             View on Google Maps
                           </a>
                         </div>
-                      ) : job.location?.coordinates?.lat && job.location?.coordinates?.lng && (
-                        <div className="p-3 bg-muted/50 text-center border-t">
-                          <a
-                            href={`https://www.openstreetmap.org/?mlat=${job.location.coordinates.lat}&mlon=${job.location.coordinates.lng}#map=15/${job.location.coordinates.lat}/${job.location.coordinates.lng}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline"
-                          >
-                            View Larger Map
-                          </a>
-                        </div>
+                      ) : (
+                        job.location?.coordinates?.lat &&
+                        job.location?.coordinates?.lng && (
+                          <div className="p-3 bg-muted/50 text-center border-t">
+                            <a
+                              href={`https://www.openstreetmap.org/?mlat=${job.location.coordinates.lat}&mlon=${job.location.coordinates.lng}#map=15/${job.location.coordinates.lat}/${job.location.coordinates.lng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-600 hover:underline"
+                            >
+                              View Larger Map
+                            </a>
+                          </div>
+                        )
                       )}
                     </div>
 
@@ -991,15 +1011,18 @@ export default function JobDetails() {
                       {/* Address */}
                       {job.location?.address && (
                         <div>
-                          <h4 className="text-sm font-medium text-muted-foreground mb-1">Address</h4>
+                          <h4 className="text-sm font-medium text-muted-foreground mb-1">
+                            Address
+                          </h4>
                           <p className="text-sm">{job.location.address}</p>
                         </div>
                       )}
-                      
+
                       {/* Get Directions Button */}
                       <a
                         href={
-                          job.location?.coordinates?.lat && job.location?.coordinates?.lng
+                          job.location?.coordinates?.lat &&
+                          job.location?.coordinates?.lng
                             ? `https://www.google.com/maps/dir/?api=1&destination=${job.location.coordinates.lat},${job.location.coordinates.lng}`
                             : job.location?.address
                             ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
@@ -1034,298 +1057,328 @@ export default function JobDetails() {
           </div>
 
           <div className="relative">
-            <Card className="sticky top-8 max-lg:fixed max-lg:bottom-0 max-lg:left-0 max-lg:right-0 max-lg:top-auto max-lg:rounded-b-none max-lg:shadow-lg max-lg:z-50 max-lg:border-t-2 max-lg:border-primary/10">
-              <CardHeader>
-                <CardTitle>Apply for this Position</CardTitle>
-                <CardDescription>
-                  Submit your application for {job.title} at {job.company}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {job.applicationMethod && (
-                  <p className="text-sm">
-                    <span className="font-medium">Application Method:</span>{" "}
-                    {job.applicationMethod}
-                  </p>
-                )}
-                {job.contactPerson && (
-                  <p className="text-sm">
-                    <span className="font-medium">Contact Person:</span>{" "}
-                    {job.contactPerson}
-                  </p>
-                )}
-                {job.applicationInstructions && (
-                  <>
-                    <Separator />
-                    <p className="text-sm text-muted-foreground">
-                      {job.applicationInstructions}
+            {/* If admin, show Edit Job Details button. Otherwise, show Apply dialog */}
+            {userProfile?.role === "admin" ? (
+              <Card className="sticky top-8 max-lg:fixed max-lg:bottom-0 max-lg:left-0 max-lg:right-0 max-lg:top-auto max-lg:rounded-b-none max-lg:shadow-lg max-lg:z-50 max-lg:border-t-2 max-lg:border-primary/10">
+                <CardHeader>
+                  <CardTitle>Edit Job Details</CardTitle>
+                  <CardDescription>
+                    You are viewing this job as an admin. You can edit the job
+                    details.
+                  </CardDescription>
+                </CardHeader>
+                <CardFooter>
+                  <Button
+                    className="w-full"
+                    onClick={() => router.push(`/admin/jobs/edit/${jobId}`)}
+                  >
+                    Edit Job
+                  </Button>
+                </CardFooter>
+              </Card>
+            ) : (
+              <Card className="sticky top-8 max-lg:fixed max-lg:bottom-0 max-lg:left-0 max-lg:right-0 max-lg:top-auto max-lg:rounded-b-none max-lg:shadow-lg max-lg:z-50 max-lg:border-t-2 max-lg:border-primary/10">
+                <CardHeader>
+                  <CardTitle>Apply for this Position</CardTitle>
+                  <CardDescription>
+                    Submit your application for {job.title} at {job.company}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {job.applicationMethod && (
+                    <p className="text-sm">
+                      <span className="font-medium">Application Method:</span>{" "}
+                      {job.applicationMethod}
                     </p>
-                  </>
-                )}
-
-                {/* Add login requirement notice */}
-                {!currentUser && (
-                  <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
-                    <p className="text-amber-700 font-medium text-sm">
-                      Login Required
-                    </p>
-                    <p className="text-amber-600 text-xs mt-1">
-                      You must be logged in to apply for this job. Please login
-                      or create an account to continue.
-                    </p>
-                  </div>
-                )}
-
-                {/* Position details */}
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <p className="text-sm font-medium mb-2">Position Details</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    {job.positionsNeeded && (
-                      <div>
-                        <p className="text-muted-foreground text-xs">
-                          Positions
-                        </p>
-                        <p>{job.positionsNeeded}</p>
-                      </div>
-                    )}
-                    {job.positionsFilled !== undefined && (
-                      <div>
-                        <p className="text-muted-foreground text-xs">Filled</p>
-                        <p>
-                          {job.positionsFilled} of {job.positionsNeeded}
-                        </p>
-                      </div>
-                    )}
-                    {job.status && (
-                      <div>
-                        <p className="text-muted-foreground text-xs">Status</p>
-                        <p>{job.status}</p>
-                      </div>
-                    )}
-                    {job.expiryDate && (
-                      <div>
-                        <p className="text-muted-foreground text-xs">Expires</p>
-                        <p>{job.expiryDate}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="max-lg:pb-8">
-                <div className="w-full flex gap-2">
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        className={hasApplied ? "flex-1" : "w-full"}
-                        variant={hasApplied ? "outline" : "default"}
-                        disabled={
-                          job.status !== "Active" ||
-                          (hasApplied && !isSubmitted)
-                        }
-                      >
-                        {hasApplied
-                          ? "Already Applied"
-                          : job.status !== "Active"
-                          ? "Applications Closed"
-                          : "Apply Now"}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      {isSubmitted ? (
-                        <div className="py-6 text-center">
-                          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                            <CheckCircle className="h-6 w-6 text-primary" />
-                          </div>
-                          <DialogTitle className="text-xl mb-2">
-                            Application Submitted!
-                          </DialogTitle>
-                          <DialogDescription>
-                            Your application for {job.title} at {job.company}{" "}
-                            has been sent successfully.
-                            <br />
-                            <br />
-                            The employer will contact you if they are interested
-                            in your application.
-                          </DialogDescription>
-                          <div className="mt-6 flex flex-col space-y-2">
-                            <Button
-                              onClick={() => {
-                                setIsSubmitted(false);
-                                router.push("/");
-                              }}
-                            >
-                              Browse More Jobs
-                            </Button>
-                            <DialogClose asChild>
-                              <Button variant="outline">Close</Button>
-                            </DialogClose>
-                          </div>
-                        </div>
-                      ) : hasApplied ? (
-                        <div className="py-6 text-center">
-                          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                            {applicationForm.status === "Hired" ? (
-                              <PartyPopper className="h-6 w-6 text-primary" />
-                            ) : (
-                              <CheckCircle className="h-6 w-6 text-primary" />
-                            )}
-                          </div>
-                          <DialogTitle className="text-xl mb-2">
-                            {applicationForm.status === "Hired"
-                              ? "Congratulations! You've Been Hired!"
-                              : "Already Applied!"}
-                          </DialogTitle>
-                          <DialogDescription>
-                            {applicationForm.status === "Hired" ? (
-                              <>
-                                You have been hired for {job.title} at{" "}
-                                {job.company}!
-                                <br />
-                                <br />
-                                Check your dashboard for more details about
-                                starting your new role.
-                              </>
-                            ) : (
-                              <>
-                                You have already applied for {job.title} at{" "}
-                                {job.company}.
-                                <br />
-                                <br />
-                                The employer will contact you if they are
-                                interested in your application.
-                              </>
-                            )}
-                          </DialogDescription>
-                          <div className="mt-6 flex flex-col space-y-2">
-                            <DialogClose asChild>
-                              <Button variant="outline">Close</Button>
-                            </DialogClose>
-                            {applicationForm.status !== "Hired" && (
-                              <Button
-                                variant="destructive"
-                                onClick={() => setIsRemoveDialogOpen(true)}
-                              >
-                                Remove Application
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <DialogHeader>
-                            <DialogTitle>Apply for {job.title}</DialogTitle>
-                            <DialogDescription>
-                              <div className="space-y-2">
-                                <p>Fill out the form below to apply for this position at {job.company}.</p>
-                                {!currentUser && (
-                                  <div className="pt-2">
-                                    <Link
-                                      href={`/login?redirect=/jobs/${jobId}`}
-                                      className="text-primary hover:underline"
-                                    >
-                                      Login to apply
-                                    </Link>
-                                  </div>
-                                )}
-                              </div>
-                            </DialogDescription>
-                          </DialogHeader>
-
-                          <form onSubmit={handleApply}>
-                            <div className="space-y-4 py-4">
-                              <div>
-                                <Label htmlFor="name">Full Name</Label>
-                                <Input
-                                  id="name"
-                                  name="name"
-                                  value={applicationForm.name}
-                                  onChange={handleChange}
-                                  required
-                                  disabled={!currentUser}
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor="email">Email</Label>
-                                <Input
-                                  id="email"
-                                  name="email"
-                                  type="email"
-                                  value={applicationForm.email}
-                                  onChange={handleChange}
-                                  required
-                                  disabled={!currentUser}
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor="phone">Phone Number</Label>
-                                <Input
-                                  id="phone"
-                                  name="phone"
-                                  type="tel"
-                                  value={applicationForm.phone}
-                                  onChange={handleChange}
-                                  required
-                                  disabled={!currentUser}
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor="coverLetter">
-                                  Cover Letter (Optional)
-                                </Label>
-                                <Textarea
-                                  id="coverLetter"
-                                  name="coverLetter"
-                                  value={applicationForm.coverLetter}
-                                  onChange={handleChange}
-                                  placeholder="Tell us why you're interested in this position..."
-                                  rows={4}
-                                  disabled={!currentUser}
-                                />
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Checkbox
-                                  id="terms"
-                                  name="termsAccepted"
-                                  checked={applicationForm.termsAccepted}
-                                  onCheckedChange={handleCheckboxChange}
-                                  disabled={!currentUser}
-                                />
-                                <Label
-                                  htmlFor="terms"
-                                  className="text-sm font-normal"
-                                >
-                                  I confirm that the information provided is
-                                  accurate
-                                </Label>
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button
-                                type="submit"
-                                disabled={isApplying || !currentUser}
-                              >
-                                {isApplying
-                                  ? "Applying..."
-                                  : "Submit Application"}
-                              </Button>
-                            </DialogFooter>
-                          </form>
-                        </>
-                      )}
-                    </DialogContent>
-                  </Dialog>
-
-                  {hasApplied && (
-                    <Button
-                      variant="outline"
-                      onClick={() => router.push("/dashboard/job-status")}
-                    >
-                      View Status
-                    </Button>
                   )}
-                </div>
-              </CardFooter>
-            </Card>
+                  {job.contactPerson && (
+                    <p className="text-sm">
+                      <span className="font-medium">Contact Person:</span>{" "}
+                      {job.contactPerson}
+                    </p>
+                  )}
+                  {job.applicationInstructions && (
+                    <>
+                      <Separator />
+                      <p className="text-sm text-muted-foreground">
+                        {job.applicationInstructions}
+                      </p>
+                    </>
+                  )}
+
+                  {/* Add login requirement notice */}
+                  {!currentUser && (
+                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+                      <p className="text-amber-700 font-medium text-sm">
+                        Login Required
+                      </p>
+                      <p className="text-amber-600 text-xs mt-1">
+                        You must be logged in to apply for this job. Please
+                        login or create an account to continue.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Position details */}
+                  <div className="bg-muted/50 p-3 rounded-lg">
+                    <p className="text-sm font-medium mb-2">Position Details</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {job.positionsNeeded && (
+                        <div>
+                          <p className="text-muted-foreground text-xs">
+                            Positions
+                          </p>
+                          <p>{job.positionsNeeded}</p>
+                        </div>
+                      )}
+                      {job.positionsFilled !== undefined && (
+                        <div>
+                          <p className="text-muted-foreground text-xs">
+                            Filled
+                          </p>
+                          <p>
+                            {job.positionsFilled} of {job.positionsNeeded}
+                          </p>
+                        </div>
+                      )}
+                      {job.status && (
+                        <div>
+                          <p className="text-muted-foreground text-xs">
+                            Status
+                          </p>
+                          <p>{job.status}</p>
+                        </div>
+                      )}
+                      {job.expiryDate && (
+                        <div>
+                          <p className="text-muted-foreground text-xs">
+                            Expires
+                          </p>
+                          <p>{job.expiryDate}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="max-lg:pb-8">
+                  <div className="w-full flex gap-2">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          className={hasApplied ? "flex-1" : "w-full"}
+                          variant={hasApplied ? "outline" : "default"}
+                          disabled={
+                            job.status !== "Active" ||
+                            (hasApplied && !isSubmitted)
+                          }
+                        >
+                          {hasApplied
+                            ? "Already Applied"
+                            : job.status !== "Active"
+                            ? "Applications Closed"
+                            : "Apply Now"}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        {isSubmitted ? (
+                          <div className="py-6 text-center">
+                            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                              <CheckCircle className="h-6 w-6 text-primary" />
+                            </div>
+                            <DialogTitle className="text-xl mb-2">
+                              Application Submitted!
+                            </DialogTitle>
+                            <DialogDescription>
+                              Your application for {job.title} at {job.company}{" "}
+                              has been sent successfully.
+                              <br />
+                              <br />
+                              The employer will contact you if they are
+                              interested in your application.
+                            </DialogDescription>
+                            <div className="mt-6 flex flex-col space-y-2">
+                              <Button
+                                onClick={() => {
+                                  setIsSubmitted(false);
+                                  router.push("/");
+                                }}
+                              >
+                                Browse More Jobs
+                              </Button>
+                              <DialogClose asChild>
+                                <Button variant="outline">Close</Button>
+                              </DialogClose>
+                            </div>
+                          </div>
+                        ) : hasApplied ? (
+                          <div className="py-6 text-center">
+                            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                              {applicationForm.status === "Hired" ? (
+                                <PartyPopper className="h-6 w-6 text-primary" />
+                              ) : (
+                                <CheckCircle className="h-6 w-6 text-primary" />
+                              )}
+                            </div>
+                            <DialogTitle className="text-xl mb-2">
+                              {applicationForm.status === "Hired"
+                                ? "Congratulations! You've Been Hired!"
+                                : "Already Applied!"}
+                            </DialogTitle>
+                            <DialogDescription>
+                              {applicationForm.status === "Hired" ? (
+                                <>
+                                  You have been hired for {job.title} at{" "}
+                                  {job.company}!
+                                  <br />
+                                  <br />
+                                  Check your dashboard for more details about
+                                  starting your new role.
+                                </>
+                              ) : (
+                                <>
+                                  You have already applied for {job.title} at{" "}
+                                  {job.company}.
+                                  <br />
+                                  <br />
+                                  The employer will contact you if they are
+                                  interested in your application.
+                                </>
+                              )}
+                            </DialogDescription>
+                            <div className="mt-6 flex flex-col space-y-2">
+                              <DialogClose asChild>
+                                <Button variant="outline">Close</Button>
+                              </DialogClose>
+                              {applicationForm.status !== "Hired" && (
+                                <Button
+                                  variant="destructive"
+                                  onClick={() => setIsRemoveDialogOpen(true)}
+                                >
+                                  Remove Application
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <DialogHeader>
+                              <DialogTitle>Apply for {job.title}</DialogTitle>
+                              <DialogDescription>
+                                <div className="space-y-2">
+                                  <p>
+                                    Fill out the form below to apply for this
+                                    position at {job.company}.
+                                  </p>
+                                  {!currentUser && (
+                                    <div className="pt-2">
+                                      <Link
+                                        href={`/login?redirect=/jobs/${jobId}`}
+                                        className="text-primary hover:underline"
+                                      >
+                                        Login to apply
+                                      </Link>
+                                    </div>
+                                  )}
+                                </div>
+                              </DialogDescription>
+                            </DialogHeader>
+
+                            <form onSubmit={handleApply}>
+                              <div className="space-y-4 py-4">
+                                <div>
+                                  <Label htmlFor="name">Full Name</Label>
+                                  <Input
+                                    id="name"
+                                    name="name"
+                                    value={applicationForm.name}
+                                    onChange={handleChange}
+                                    required
+                                    disabled={!currentUser}
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="email">Email</Label>
+                                  <Input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    value={applicationForm.email}
+                                    onChange={handleChange}
+                                    required
+                                    disabled={!currentUser}
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="phone">Phone Number</Label>
+                                  <Input
+                                    id="phone"
+                                    name="phone"
+                                    type="tel"
+                                    value={applicationForm.phone}
+                                    onChange={handleChange}
+                                    required
+                                    disabled={!currentUser}
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="coverLetter">
+                                    Cover Letter (Optional)
+                                  </Label>
+                                  <Textarea
+                                    id="coverLetter"
+                                    name="coverLetter"
+                                    value={applicationForm.coverLetter}
+                                    onChange={handleChange}
+                                    placeholder="Tell us why you're interested in this position..."
+                                    rows={4}
+                                    disabled={!currentUser}
+                                  />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id="terms"
+                                    name="termsAccepted"
+                                    checked={applicationForm.termsAccepted}
+                                    onCheckedChange={handleCheckboxChange}
+                                    disabled={!currentUser}
+                                  />
+                                  <Label
+                                    htmlFor="terms"
+                                    className="text-sm font-normal"
+                                  >
+                                    I confirm that the information provided is
+                                    accurate
+                                  </Label>
+                                </div>
+                              </div>
+                              <DialogFooter>
+                                <Button
+                                  type="submit"
+                                  disabled={isApplying || !currentUser}
+                                >
+                                  {isApplying
+                                    ? "Applying..."
+                                    : "Submit Application"}
+                                </Button>
+                              </DialogFooter>
+                            </form>
+                          </>
+                        )}
+                      </DialogContent>
+                    </Dialog>
+
+                    {hasApplied && (
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push("/dashboard/job-status")}
+                      >
+                        View Status
+                      </Button>
+                    )}
+                  </div>
+                </CardFooter>
+              </Card>
+            )}
           </div>
         </div>
       </div>

@@ -125,7 +125,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-
 // Add these interfaces at the top of the file after imports
 interface JobData {
   id: string;
@@ -162,6 +161,7 @@ interface JobData {
     appliedDate: string;
     status: string;
     avatar: string;
+    phone?: string;
   }[];
   timeline: {
     id: string;
@@ -215,6 +215,16 @@ const convertTimestampToDate = (timestamp: any) => {
   return new Date();
 };
 
+// Helper to map status for display
+const getDisplayStatus = (status: string) => {
+  if (status === "Filled") return "Completed";
+  return status;
+};
+
+// Helper to check if status is completed (including 'Filled')
+const isCompletedStatus = (status: string) =>
+  status === "Completed" || status === "Filled";
+
 export default function AdminJobDetail() {
   const router = useRouter();
   const params = useParams();
@@ -225,12 +235,15 @@ export default function AdminJobDetail() {
   const [isApproving, setIsApproving] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAddingApplicant, setIsAddingApplicant] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState<JobData['applicants'][0] | null>(null);
+  const [selectedApplication, setSelectedApplication] = useState<
+    JobData["applicants"][0] | null
+  >(null);
   const [isHiring, setIsHiring] = useState(false);
   const [isRemovingHire, setIsRemovingHire] = useState(false);
   const [isMarkingWorkFinished, setIsMarkingWorkFinished] = useState(false);
-  const [isMarkingPaymentReceived, setIsMarkingPaymentReceived] = useState(false);
+  const [isMarkingPaymentReceived, setIsMarkingPaymentReceived] =
     useState(false);
+  useState(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [selectedApplicant, setSelectedApplicant] = useState<
     JobData["applicants"][0] | null
@@ -323,6 +336,7 @@ export default function AdminJobDetail() {
                 status: data.status || "Applied",
                 avatar:
                   userData?.photoURL || "/placeholder.svg?height=32&width=32",
+                phone: data.phone || "",
               };
             }
           )
@@ -957,6 +971,25 @@ export default function AdminJobDetail() {
     );
   }
 
+  // Debug: log the current job status
+  console.log("Job Status:", jobData.status);
+
+  // Status order for flow chart
+  const statusOrder = [
+    "Draft",
+    "Pending",
+    "Active",
+    "Filling",
+    "Completed",
+    "Work Finished",
+    "Payment Pending",
+    "Payment Distributed",
+    // Add any aliases if needed
+  ];
+  // Map 'Filled' to 'Completed' for index logic
+  const normalizedStatus = jobData.status === "Filled" ? "Completed" : jobData.status;
+  const currentStatusIndex = statusOrder.indexOf(normalizedStatus);
+
   return (
     <div className="min-h-screen bg-background flex">
       <AdminSidebar
@@ -993,7 +1026,7 @@ export default function AdminJobDetail() {
                       jobData.status === "Active" ? "default" : "outline"
                     }
                   >
-                    {jobData.status}
+                    {getDisplayStatus(jobData.status)}
                   </Badge>
                   {jobData.status === "Deactivated" && (
                     <Badge variant="destructive">Deactivated</Badge>
@@ -1272,7 +1305,7 @@ export default function AdminJobDetail() {
                 <Button
                   variant="outline"
                   className="flex items-center gap-2"
-                  onClick={() => setIsEditDialogOpen(true)}
+                  onClick={() => router.push(`/admin/jobs/edit/${jobData.id}`)}
                 >
                   <Edit className="h-4 w-4" />
                   Edit Job
@@ -1300,14 +1333,14 @@ export default function AdminJobDetail() {
                         <div className="relative">
                           <div
                             className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                              jobData.status === "Draft"
+                              currentStatusIndex === 0
                                 ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
-                                : jobData.status !== "Draft"
+                                : currentStatusIndex > 0
                                 ? "bg-green-500 text-white"
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {jobData.status !== "Draft" ? (
+                            {currentStatusIndex > 0 ? (
                               <CheckCircle className="h-5 w-5" />
                             ) : (
                               <FileText className="h-5 w-5" />
@@ -1316,9 +1349,7 @@ export default function AdminJobDetail() {
                         </div>
                         <span
                           className={`text-xs mt-2 font-medium ${
-                            jobData.status === "Draft"
-                              ? "text-primary"
-                              : "text-muted-foreground"
+                            currentStatusIndex === 0 ? "text-primary" : "text-muted-foreground"
                           }`}
                         >
                           Draft
@@ -1330,26 +1361,14 @@ export default function AdminJobDetail() {
                         <div className="relative">
                           <div
                             className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                              jobData.status === "Pending"
+                              currentStatusIndex === 1
                                 ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
-                                : [
-                                    "Active",
-                                    "Filling",
-                                    "Completed",
-                                    "Payment Pending",
-                                    "Payment Distributed",
-                                  ].includes(jobData.status)
+                                : currentStatusIndex > 1
                                 ? "bg-green-500 text-white"
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {[
-                              "Active",
-                              "Filling",
-                              "Completed",
-                              "Payment Pending",
-                              "Payment Distributed",
-                            ].includes(jobData.status) ? (
+                            {currentStatusIndex > 1 ? (
                               <CheckCircle className="h-5 w-5" />
                             ) : (
                               <Shield className="h-5 w-5" />
@@ -1358,9 +1377,7 @@ export default function AdminJobDetail() {
                         </div>
                         <span
                           className={`text-xs mt-2 font-medium ${
-                            jobData.status === "Pending"
-                              ? "text-primary"
-                              : "text-muted-foreground"
+                            currentStatusIndex === 1 ? "text-primary" : "text-muted-foreground"
                           }`}
                         >
                           Pending Approval
@@ -1372,24 +1389,14 @@ export default function AdminJobDetail() {
                         <div className="relative">
                           <div
                             className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                              jobData.status === "Active"
+                              currentStatusIndex === 2
                                 ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
-                                : [
-                                    "Filling",
-                                    "Completed",
-                                    "Payment Pending",
-                                    "Payment Distributed",
-                                  ].includes(jobData.status)
+                                : currentStatusIndex > 2
                                 ? "bg-green-500 text-white"
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {[
-                              "Filling",
-                              "Completed",
-                              "Payment Pending",
-                              "Payment Distributed",
-                            ].includes(jobData.status) ? (
+                            {currentStatusIndex > 2 ? (
                               <CheckCircle className="h-5 w-5" />
                             ) : (
                               <CheckCircle className="h-5 w-5" />
@@ -1398,9 +1405,7 @@ export default function AdminJobDetail() {
                         </div>
                         <span
                           className={`text-xs mt-2 font-medium ${
-                            jobData.status === "Active"
-                              ? "text-primary"
-                              : "text-muted-foreground"
+                            currentStatusIndex === 2 ? "text-primary" : "text-muted-foreground"
                           }`}
                         >
                           Active
@@ -1412,22 +1417,14 @@ export default function AdminJobDetail() {
                         <div className="relative">
                           <div
                             className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                              jobData.status === "Filling"
+                              currentStatusIndex === 3
                                 ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
-                                : [
-                                    "Completed",
-                                    "Payment Pending",
-                                    "Payment Distributed",
-                                  ].includes(jobData.status)
+                                : currentStatusIndex > 3
                                 ? "bg-green-500 text-white"
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {[
-                              "Completed",
-                              "Payment Pending",
-                              "Payment Distributed",
-                            ].includes(jobData.status) ? (
+                            {currentStatusIndex > 3 ? (
                               <CheckCircle className="h-5 w-5" />
                             ) : (
                               <Users className="h-5 w-5" />
@@ -1443,9 +1440,7 @@ export default function AdminJobDetail() {
                         </div>
                         <span
                           className={`text-xs mt-2 font-medium ${
-                            jobData.status === "Filling"
-                              ? "text-primary"
-                              : "text-muted-foreground"
+                            currentStatusIndex === 3 ? "text-primary" : "text-muted-foreground"
                           }`}
                         >
                           Filling
@@ -1457,22 +1452,14 @@ export default function AdminJobDetail() {
                         <div className="relative">
                           <div
                             className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                              jobData.status === "Completed"
+                              currentStatusIndex === 4
                                 ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
-                                : [
-                                    "Work Finished",
-                                    "Payment Pending",
-                                    "Payment Distributed",
-                                  ].includes(jobData.status)
+                                : currentStatusIndex > 4
                                 ? "bg-green-500 text-white"
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {[
-                              "Work Finished",
-                              "Payment Pending",
-                              "Payment Distributed",
-                            ].includes(jobData.status) ? (
+                            {currentStatusIndex > 4 ? (
                               <CheckCircle className="h-5 w-5" />
                             ) : (
                               <Briefcase className="h-5 w-5" />
@@ -1481,9 +1468,7 @@ export default function AdminJobDetail() {
                         </div>
                         <span
                           className={`text-xs mt-2 font-medium ${
-                            jobData.status === "Completed"
-                              ? "text-primary"
-                              : "text-muted-foreground"
+                            currentStatusIndex === 4 ? "text-primary" : "text-muted-foreground"
                           }`}
                         >
                           Completed
@@ -1495,20 +1480,14 @@ export default function AdminJobDetail() {
                         <div className="relative">
                           <div
                             className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                              jobData.status === "Work Finished"
+                              currentStatusIndex === 5
                                 ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
-                                : [
-                                    "Payment Pending",
-                                    "Payment Distributed",
-                                  ].includes(jobData.status)
+                                : currentStatusIndex > 5
                                 ? "bg-green-500 text-white"
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {[
-                              "Payment Pending",
-                              "Payment Distributed",
-                            ].includes(jobData.status) ? (
+                            {currentStatusIndex > 5 ? (
                               <CheckCircle className="h-5 w-5" />
                             ) : (
                               <CheckCircle className="h-5 w-5" />
@@ -1517,9 +1496,7 @@ export default function AdminJobDetail() {
                         </div>
                         <span
                           className={`text-xs mt-2 font-medium ${
-                            jobData.status === "Work Finished"
-                              ? "text-primary"
-                              : "text-muted-foreground"
+                            currentStatusIndex === 5 ? "text-primary" : "text-muted-foreground"
                           }`}
                         >
                           Work Finished
@@ -1531,14 +1508,14 @@ export default function AdminJobDetail() {
                         <div className="relative">
                           <div
                             className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                              jobData.status === "Payment Pending"
+                              currentStatusIndex === 6
                                 ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
-                                : jobData.status === "Payment Distributed"
+                                : currentStatusIndex > 6
                                 ? "bg-green-500 text-white"
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {jobData.status === "Payment Distributed" ? (
+                            {currentStatusIndex > 6 ? (
                               <CheckCircle className="h-5 w-5" />
                             ) : (
                               <DollarSign className="h-5 w-5" />
@@ -1547,9 +1524,7 @@ export default function AdminJobDetail() {
                         </div>
                         <span
                           className={`text-xs mt-2 font-medium ${
-                            jobData.status === "Payment Pending"
-                              ? "text-primary"
-                              : "text-muted-foreground"
+                            currentStatusIndex === 6 ? "text-primary" : "text-muted-foreground"
                           }`}
                         >
                           Payment Pending
@@ -1561,7 +1536,7 @@ export default function AdminJobDetail() {
                         <div className="relative">
                           <div
                             className={`z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                              jobData.status === "Payment Distributed"
+                              currentStatusIndex === 7
                                 ? "bg-primary text-primary-foreground scale-110 shadow-lg ring-4 ring-primary/20"
                                 : "bg-muted text-muted-foreground"
                             }`}
@@ -1571,9 +1546,7 @@ export default function AdminJobDetail() {
                         </div>
                         <span
                           className={`text-xs mt-2 font-medium ${
-                            jobData.status === "Payment Distributed"
-                              ? "text-primary"
-                              : "text-muted-foreground"
+                            currentStatusIndex === 7 ? "text-primary" : "text-muted-foreground"
                           }`}
                         >
                           Payment Distributed
@@ -1593,6 +1566,7 @@ export default function AdminJobDetail() {
                               "Active",
                               "Filling",
                               "Completed",
+                              "Work Finished",
                               "Payment Pending",
                               "Payment Distributed",
                             ];
@@ -1610,7 +1584,7 @@ export default function AdminJobDetail() {
                     <div className="space-y-4">
                       <div
                         className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
-                          jobData.status === "Draft" ? "bg-primary/10" : ""
+                          currentStatusIndex === 0 ? "bg-primary/10" : ""
                         }`}
                       >
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1625,7 +1599,7 @@ export default function AdminJobDetail() {
                       </div>
                       <div
                         className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
-                          jobData.status === "Pending" ? "bg-primary/10" : ""
+                          currentStatusIndex === 1 ? "bg-primary/10" : ""
                         }`}
                       >
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1640,7 +1614,7 @@ export default function AdminJobDetail() {
                       </div>
                       <div
                         className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
-                          jobData.status === "Active" ? "bg-primary/10" : ""
+                          currentStatusIndex === 2 ? "bg-primary/10" : ""
                         }`}
                       >
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1657,7 +1631,7 @@ export default function AdminJobDetail() {
                     <div className="space-y-4">
                       <div
                         className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
-                          jobData.status === "Filling" ? "bg-primary/10" : ""
+                          currentStatusIndex === 3 ? "bg-primary/10" : ""
                         }`}
                       >
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1674,7 +1648,7 @@ export default function AdminJobDetail() {
                       </div>
                       <div
                         className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
-                          jobData.status === "Completed" ? "bg-primary/10" : ""
+                          currentStatusIndex === 4 ? "bg-primary/10" : ""
                         }`}
                       >
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1689,9 +1663,7 @@ export default function AdminJobDetail() {
                       </div>
                       <div
                         className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
-                          jobData.status === "Work Finished"
-                            ? "bg-primary/10"
-                            : ""
+                          currentStatusIndex === 5 ? "bg-primary/10" : ""
                         }`}
                       >
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1706,10 +1678,7 @@ export default function AdminJobDetail() {
                       </div>
                       <div
                         className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
-                          jobData.status === "Payment Pending" ||
-                          jobData.status === "Payment Distributed"
-                            ? "bg-primary/10"
-                            : ""
+                          currentStatusIndex === 6 ? "bg-primary/10" : ""
                         }`}
                       >
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1833,6 +1802,7 @@ export default function AdminJobDetail() {
                               <TableHead className="text-right">
                                 Actions
                               </TableHead>
+                              <TableHead>Contact</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1851,13 +1821,20 @@ export default function AdminJobDetail() {
                                         </AvatarFallback>
                                       </Avatar>
                                       <div>
-                                        <Link 
+                                        <Link
                                           href={`/admin/users/${applicant.userId}`}
                                           className="font-medium hover:underline cursor-pointer"
                                           onClick={(e) => {
-                                            if (!applicant.userId || applicant.email.includes('manual-')) {
+                                            if (
+                                              !applicant.userId ||
+                                              applicant.email.includes(
+                                                "manual-"
+                                              )
+                                            ) {
                                               e.preventDefault();
-                                              toast.info('This applicant does not have a user profile');
+                                              toast.info(
+                                                "This applicant does not have a user profile"
+                                              );
                                             }
                                           }}
                                         >
@@ -1928,15 +1905,24 @@ export default function AdminJobDetail() {
                                         <DropdownMenuLabel>
                                           Actions
                                         </DropdownMenuLabel>
-                                        <DropdownMenuItem 
+                                        <DropdownMenuItem
                                           onClick={() => {
                                             // For manual applicants, we don't have a user profile to link to
-                                            if (applicant.email.includes('manual-') || !applicant.userId) {
-                                              toast.info('This applicant does not have a user profile');
+                                            if (
+                                              applicant.email.includes(
+                                                "manual-"
+                                              ) ||
+                                              !applicant.userId
+                                            ) {
+                                              toast.info(
+                                                "This applicant does not have a user profile"
+                                              );
                                               return;
                                             }
                                             // Use the userId from the application data
-                                            router.push(`/admin/users/${applicant.userId}`);
+                                            router.push(
+                                              `/admin/users/${applicant.userId}`
+                                            );
                                           }}
                                           className="cursor-pointer"
                                         >
@@ -1944,7 +1930,9 @@ export default function AdminJobDetail() {
                                           View Profile
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
-                                          onClick={() => setSelectedApplication(applicant)}
+                                          onClick={() =>
+                                            setSelectedApplication(applicant)
+                                          }
                                           className="cursor-pointer"
                                         >
                                           <FileText className="mr-2 h-4 w-4" />
@@ -1997,6 +1985,26 @@ export default function AdminJobDetail() {
                                       </DropdownMenuContent>
                                     </DropdownMenu>
                                   </TableCell>
+                                  <TableCell>
+                                    {applicant.phone ? (
+                                      <div className="flex gap-2">
+                                        <a href={`tel:${applicant.phone}`} target="_blank" rel="noopener noreferrer">
+                                          <Button variant="outline" size="sm">
+                                            <Phone className="h-4 w-4 mr-1" />
+                                            Call
+                                          </Button>
+                                        </a>
+                                        <a href={`https://wa.me/${applicant.phone.replace(/[^\d]/g, "")}`} target="_blank" rel="noopener noreferrer">
+                                          <Button variant="outline" size="sm" className="bg-green-100 text-green-700 hover:bg-green-200">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor" className="h-4 w-4 mr-1"><path d="M16.003 3.2c-7.06 0-12.8 5.74-12.8 12.8 0 2.26.6 4.47 1.74 6.41L2.2 28.2l5.97-2.01c1.85 1.01 3.94 1.54 6.07 1.54h.01c7.06 0 12.8-5.74 12.8-12.8s-5.74-12.8-12.8-12.8zm0 23.2c-1.87 0-3.7-.48-5.3-1.39l-.38-.21-3.54 1.19 1.18-3.45-.25-.39c-1.09-1.7-1.67-3.67-1.67-5.7 0-5.79 4.71-10.5 10.5-10.5s10.5 4.71 10.5 10.5-4.71 10.5-10.5 10.5zm5.77-7.97c-.32-.16-1.89-.93-2.18-1.03-.29-.11-.5-.16-.71.16-.21.32-.82 1.03-1.01 1.24-.18.21-.37.24-.69.08-.32-.16-1.36-.5-2.59-1.59-.96-.85-1.61-1.89-1.8-2.21-.19-.32-.02-.49.14-.65.14-.14.32-.37.48-.55.16-.18.21-.32.32-.53.11-.21.05-.4-.03-.56-.08-.16-.71-1.71-.97-2.34-.26-.62-.53-.54-.71-.55-.18-.01-.39-.01-.6-.01-.21 0-.56.08-.85.4-.29.32-1.12 1.09-1.12 2.65 0 1.56 1.14 3.06 1.3 3.27.16.21 2.24 3.42 5.43 4.66.76.33 1.35.53 1.81.68.76.24 1.45.21 2 .13.61-.09 1.89-.77 2.16-1.52.27-.75.27-1.39.19-1.52-.08-.13-.29-.21-.61-.37z"/></svg>
+                                            WhatsApp
+                                          </Button>
+                                        </a>
+                                      </div>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">No phone</span>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               )
                             )}
@@ -2048,8 +2056,8 @@ export default function AdminJobDetail() {
               </Tabs>
 
               {/* Application Details Dialog */}
-              <Dialog 
-                open={!!selectedApplication} 
+              <Dialog
+                open={!!selectedApplication}
                 onOpenChange={(open) => !open && setSelectedApplication(null)}
               >
                 <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -2064,62 +2072,88 @@ export default function AdminJobDetail() {
                       <div className="space-y-6 py-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
-                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Applicant</h3>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                              Applicant
+                            </h3>
                             <div className="flex items-center gap-3">
                               <Avatar className="h-10 w-10">
-                                <AvatarImage src={selectedApplication.avatar} alt={selectedApplication.name} />
-                                <AvatarFallback>{selectedApplication.name.charAt(0)}</AvatarFallback>
+                                <AvatarImage
+                                  src={selectedApplication.avatar}
+                                  alt={selectedApplication.name}
+                                />
+                                <AvatarFallback>
+                                  {selectedApplication.name.charAt(0)}
+                                </AvatarFallback>
                               </Avatar>
                               <div>
-                                <p className="font-medium">{selectedApplication.name}</p>
-                                <p className="text-sm text-muted-foreground">{selectedApplication.email}</p>
+                                <p className="font-medium">
+                                  {selectedApplication.name}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {selectedApplication.email}
+                                </p>
                               </div>
                             </div>
                           </div>
                           <div>
-                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Application Status</h3>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                              Application Status
+                            </h3>
                             <Badge
                               variant={
-                                selectedApplication.status === 'Hired'
-                                  ? 'default'
-                                  : selectedApplication.status === 'Rejected'
-                                  ? 'destructive'
-                                  : 'secondary'
+                                selectedApplication.status === "Hired"
+                                  ? "default"
+                                  : selectedApplication.status === "Rejected"
+                                  ? "destructive"
+                                  : "secondary"
                               }
                             >
                               {selectedApplication.status}
                             </Badge>
                           </div>
                           <div>
-                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Applied On</h3>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                              Applied On
+                            </h3>
                             <p>{selectedApplication.appliedDate}</p>
                           </div>
                           <div>
-                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Contact</h3>
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                              Contact
+                            </h3>
                             <p className="text-sm">
                               {selectedApplication.email}
-                              {selectedApplication.phone && ` • ${selectedApplication.phone}`}
+                              {selectedApplication.phone &&
+                                ` • ${selectedApplication.phone}`}
                             </p>
                           </div>
                         </div>
-                        
+
                         <div className="border-t pt-4">
-                          <h3 className="text-sm font-medium text-muted-foreground mb-2">Cover Letter</h3>
+                          <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                            Cover Letter
+                          </h3>
                           <div className="bg-muted/50 p-4 rounded-md">
                             {selectedApplication.coverLetter ? (
-                              <p className="whitespace-pre-line">{selectedApplication.coverLetter}</p>
+                              <p className="whitespace-pre-line">
+                                {selectedApplication.coverLetter}
+                              </p>
                             ) : (
-                              <p className="text-muted-foreground text-sm">No cover letter provided</p>
+                              <p className="text-muted-foreground text-sm">
+                                No cover letter provided
+                              </p>
                             )}
                           </div>
                         </div>
 
                         {selectedApplication.resumeUrl && (
                           <div className="border-t pt-4">
-                            <h3 className="text-sm font-medium text-muted-foreground mb-2">Resume</h3>
-                            <a 
-                              href={selectedApplication.resumeUrl} 
-                              target="_blank" 
+                            <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                              Resume
+                            </h3>
+                            <a
+                              href={selectedApplication.resumeUrl}
+                              target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center text-primary hover:underline"
                             >
@@ -2131,24 +2165,30 @@ export default function AdminJobDetail() {
                       </div>
 
                       <div className="flex justify-end gap-2 pt-4 border-t">
-                        {selectedApplication.status !== 'Hired' ? (
+                        {selectedApplication.status !== "Hired" ? (
                           <Button
-                            onClick={() => handleHireApplicant(selectedApplication.id)}
+                            onClick={() =>
+                              handleHireApplicant(selectedApplication.id)
+                            }
                             disabled={isHiring}
                             className="flex items-center gap-2"
                           >
                             <CheckCircle className="h-4 w-4" />
-                            {isHiring ? 'Marking as Hired...' : 'Mark as Hired'}
+                            {isHiring ? "Marking as Hired..." : "Mark as Hired"}
                           </Button>
                         ) : (
                           <Button
-                            onClick={() => handleRemoveHire(selectedApplication.id)}
+                            onClick={() =>
+                              handleRemoveHire(selectedApplication.id)
+                            }
                             variant="outline"
                             disabled={isRemovingHire}
                             className="flex items-center gap-2"
                           >
                             <X className="h-4 w-4" />
-                            {isRemovingHire ? 'Removing Hire...' : 'Remove Hire Status'}
+                            {isRemovingHire
+                              ? "Removing Hire..."
+                              : "Remove Hire Status"}
                           </Button>
                         )}
                       </div>
@@ -2220,7 +2260,7 @@ export default function AdminJobDetail() {
                         {isUndoing ? "Reverting..." : "Revert to Active"}
                       </Button>
                     )}
-                    {jobData.status === "Completed" && (
+                    {isCompletedStatus(jobData.status) && (
                       <Button
                         onClick={handleUndoStatus}
                         disabled={isUndoing}
@@ -2269,7 +2309,9 @@ export default function AdminJobDetail() {
                     <Button
                       variant="outline"
                       className="flex items-center gap-2"
-                      onClick={() => setIsEditDialogOpen(true)}
+                      onClick={() =>
+                        router.push(`/admin/jobs/edit/${jobData.id}`)
+                      }
                     >
                       <Edit className="h-4 w-4" />
                       Edit Job
@@ -2301,7 +2343,7 @@ export default function AdminJobDetail() {
                           Mark as Filled
                         </Button>
                       )}
-                    {jobData.status === "Completed" && (
+                    {isCompletedStatus(jobData.status) && (
                       <Button
                         variant="outline"
                         className="flex items-center gap-2"
@@ -2458,9 +2500,6 @@ export default function AdminJobDetail() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-
-
- 
         </main>
       </div>
     </div>

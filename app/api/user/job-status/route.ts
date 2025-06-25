@@ -21,7 +21,7 @@ const mockJobStatus: JobStatus[] = [
     duration: "3 months",
     type: "Contract",
     appliedDate: "June 1, 2023",
-    status: "in-progress",
+    status: "hired",
     postedDate: "May 25, 2023",
     startDate: "June 10, 2023"
   },
@@ -51,8 +51,8 @@ export async function GET(request: NextRequest) {
   try {
     // Get user ID from the Authorization header
     const headersList = headers();
-    const authHeader = headersList.get('authorization');
-    const userId = authHeader?.split('Bearer ')[1];
+    const authHeader = headersList.get('authorization') || '';
+    const userId = authHeader.split('Bearer ')[1];
     
     // If no valid user ID is found, return mock data for testing
     // In a production app, you'd return 401 Unauthorized
@@ -108,19 +108,19 @@ export async function GET(request: NextRequest) {
         // Create job status object
         const jobStatus: JobStatus = {
           id: applicationId,
-          title: appData.jobTitle || jobData.title || 'Untitled Position',
-          company: appData.company || jobData.company || 'Unknown Company',
+          title: appData.jobTitle || (jobData as any).title || 'Untitled Position',
+          company: appData.company || (jobData as any).company || 'Unknown Company',
           location: {
-            city: jobData.location?.city || 'Remote',
-            state: jobData.location?.state || '',
-            display: jobData.location?.display || 'Remote'
+            city: (jobData as any).location?.city || 'Remote',
+            state: (jobData as any).location?.state || '',
+            display: (jobData as any).location?.display || 'Remote'
           },
-          hours: jobData.hours || 'Flexible',
-          rate: jobData.salaryAmount ? `₹${jobData.salaryAmount}/${jobData.salaryType || 'hour'}` : 'Negotiable',
-          duration: jobData.duration || 'Not specified',
-          type: jobData.jobType || 'Not specified',
-          postedDate: jobData.postedDate || 'Unknown',
-          status: status as "applied" | "approved" | "in-progress" | "completed" | "paid",
+          hours: (jobData as any).hours || 'Flexible',
+          rate: (jobData as any).salaryAmount ? `₹${(jobData as any).salaryAmount}/${(jobData as any).salaryType || 'hour'}` : 'Negotiable',
+          duration: (jobData as any).duration || 'Not specified',
+          type: (jobData as any).jobType || 'Not specified',
+          postedDate: (jobData as any).postedDate || 'Unknown',
+          status: status as "applied" | "approved" | "hired" | "completed" | "paid",
           appliedDate: appliedDate,
           // Optional fields
           approvedDate: appData.approvedDate ? new Date(appData.approvedDate.toDate()).toLocaleDateString('en-US', {

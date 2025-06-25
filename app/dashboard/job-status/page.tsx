@@ -16,8 +16,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import JobTimeline from "@/components/dashboard/job-timeline";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, getDoc } from "firebase/firestore";
 import { db } from "@/app/config/firebase";
+import { RupeeIcon } from "@/components/ui/rupee-icon";
 
 interface JobStatus {
   id: string;
@@ -30,12 +31,13 @@ interface JobStatus {
   };
   rate: string;
   type: string;
-  status: "applied" | "approved" | "in-progress" | "completed" | "paid";
+  status: "applied" | "approved" | "hired" | "completed" | "paid";
   appliedDate: string;
   approvedDate?: string;
   startDate?: string;
   endDate?: string;
   paymentDate?: string;
+  jobStatus?: string;
 }
 
 export default function JobStatusPage() {
@@ -73,17 +75,24 @@ export default function JobStatusPage() {
           setLoading(true);
           const jobsData: JobStatus[] = [];
 
-          snapshot.docs.forEach((doc) => {
-            const data = doc.data();
+          snapshot.docs.forEach(async (docSnap) => {
+            const data = docSnap.data();
+            let relatedJobStatus = undefined;
+            if (data.status?.toLowerCase() === "hired" && data.jobId) {
+              const jobDocRef = doc(db, "jobs", data.jobId);
+              const jobDocSnap = await getDoc(jobDocRef);
+              if (jobDocSnap.exists()) {
+                relatedJobStatus = (jobDocSnap.data() as any).status;
+              }
+            }
             jobsData.push({
-              id: doc.id,
+              id: docSnap.id,
               title: data.jobTitle || "Untitled Job",
               company: data.company || "Unknown Company",
               location: data.location || { city: "", state: "" },
               rate: data.rate || "Not specified",
               type: data.type || "Not specified",
-              status: (data.status?.toLowerCase() ||
-                "applied") as JobStatus["status"],
+              status: (data.status?.toLowerCase() || "applied") as JobStatus["status"],
               appliedDate: new Date(
                 data.createdAt?.seconds * 1000
               ).toLocaleDateString(),
@@ -103,6 +112,7 @@ export default function JobStatusPage() {
                     data.paymentDate?.seconds * 1000
                   ).toLocaleDateString()
                 : undefined,
+              jobStatus: relatedJobStatus,
             });
           });
 
@@ -138,6 +148,21 @@ export default function JobStatusPage() {
 
   const filteredJobs = jobs.filter((job) => {
     if (selectedTab === "all") return true;
+    if (selectedTab === "approved") {
+      return (
+        (job.status.toLowerCase() === "approved" || job.status.toLowerCase() === "hired") &&
+        job.status.toLowerCase() !== "hired"
+      );
+    }
+    if (selectedTab === "completed") {
+      return job.status.toLowerCase() === "hired" || job.status.toLowerCase() === "completed";
+    }
+    if (selectedTab === "paid") {
+      return (
+        String(job.status).toLowerCase() === "payment received" ||
+        (job.status === "hired" && String(job.jobStatus).toLowerCase() === "payment received")
+      );
+    }
     return job.status.toLowerCase() === selectedTab.toLowerCase();
   });
 
@@ -169,11 +194,10 @@ export default function JobStatusPage() {
         value={selectedTab}
         onValueChange={setSelectedTab}
       >
-        <TabsList className="grid grid-cols-6 mb-6">
+        <TabsList className="grid grid-cols-5 mb-6">
           <TabsTrigger value="all">All Jobs</TabsTrigger>
           <TabsTrigger value="applied">Applied</TabsTrigger>
           <TabsTrigger value="approved">Approved</TabsTrigger>
-          <TabsTrigger value="in-progress">In Progress</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
           <TabsTrigger value="paid">Paid</TabsTrigger>
         </TabsList>
@@ -199,6 +223,25 @@ export default function JobStatusPage() {
                     </span>
                   </div>
                 </div>
+                {selectedTab === "completed" && String(job.jobStatus).toLowerCase() === "payment received" && (
+                  <span className="ml-2" title="Paid">
+                    <svg width="32" height="32" viewBox="0 0 512 512" fill="none">
+                      <circle cx="256" cy="256" r="256" fill="#C6F6D5"/>
+                      <circle cx="256" cy="256" r="208" fill="#fff" stroke="#38A169" strokeWidth="16"/>
+                      <path d="M160 256l64 64 128-128" stroke="#38A169" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                      <text
+                        x="50%"
+                        y="60%"
+                        textAnchor="middle"
+                        fill="#222"
+                        fontSize="96"
+                        fontWeight="bold"
+                        fontFamily="Arial, sans-serif"
+                        dy=".3em"
+                      >PAID</text>
+                    </svg>
+                  </span>
+                )}
               </div>
             ))}
 
@@ -212,6 +255,13 @@ export default function JobStatusPage() {
                 </p>
               </div>
             )}
+
+            {selectedTab === "completed" &&
+              filteredJobs.filter(job => String(job.jobStatus).toLowerCase() !== "payment received").length > 0 && (
+                <div className="col-span-full text-center py-4">
+                  <p className="text-warning-foreground">Payment not received for some completed jobs.</p>
+                </div>
+              )}
           </div>
         </TabsContent>
       </Tabs>
