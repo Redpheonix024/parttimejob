@@ -14,6 +14,7 @@ import { DropdownMenu } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { getRelativeTime } from "@/utils/relative-time";
+import { useSSERefresh } from "@/hooks/useSSERefresh";
 
 // Define constants for job counts
 const INITIAL_JOB_LOAD = 6;
@@ -83,6 +84,7 @@ const JobListHeader = ({
 };
 
 export default function Home() {
+  useSSERefresh();
   const [searchQuery, setSearchQuery] = useState("");
   const [locationFilter, setLocationFilter] = useState("anywhere");
   const [sortBy, setSortBy] = useState("newest");
