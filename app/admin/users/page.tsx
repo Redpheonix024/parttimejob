@@ -48,9 +48,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/app/config/firebase";
 import { format } from "date-fns";
+import { checkFirebaseConfig } from "@/utils/env-check";
+import FirebaseError from "@/components/admin/firebase-error";
+import { getFirebaseDb } from "@/utils/firebase-client";
 
 interface User {
   id: string;
@@ -64,10 +65,26 @@ interface User {
   photoURL?: string;
 }
 
+// Safe date formatting
+const formatDate = (dateString: any): string => {
+  try {
+    if (!dateString) return 'N/A';
+    
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'N/A';
+    
+    return format(date, 'MMM d, yyyy');
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return 'N/A';
+  }
+};
+
 export default function AdminUsers() {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [userTypeFilter, setUserTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -78,6 +95,16 @@ export default function AdminUsers() {
 
   const fetchUsers = async () => {
     try {
+      setLoading(true);
+      setError(null);
+
+      const db = await getFirebaseDb();
+      if (!db) {
+        setError("Failed to initialize Firebase");
+        return;
+      }
+
+      const { collection, getDocs, query } = await import("firebase/firestore");
       const usersRef = collection(db, "users");
       const q = query(usersRef);
       const querySnapshot = await getDocs(q);
@@ -91,7 +118,7 @@ export default function AdminUsers() {
           email: data.email || '',
           role: data.role || 'user',
           location: data.location || '',
-          createdAt: data.createdAt ? format(new Date(data.createdAt), 'MMM d, yyyy') : 'N/A',
+          createdAt: formatDate(data.createdAt),
           status: data.status || 'active',
           photoURL: data.photoURL || ''
         };
@@ -100,6 +127,7 @@ export default function AdminUsers() {
       setUsers(usersData);
     } catch (error) {
       console.error("Error fetching users:", error);
+      setError("Failed to fetch users. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -111,10 +139,12 @@ export default function AdminUsers() {
 
   const handleToggleStatus = async (userId: string, currentStatus: string) => {
     // Implementation for toggling user status
+    console.log("Toggle status for user:", userId, "Current status:", currentStatus);
   };
 
   const handleDeleteUser = async (userId: string) => {
     // Implementation for deleting user
+    console.log("Delete user:", userId);
   };
 
   // Filter users based on search query and filters
@@ -137,6 +167,20 @@ export default function AdminUsers() {
 
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  if (error) {
+    return (
+      <AdminLayout activeLink="users" title="User Management">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <FirebaseError 
+            error={error} 
+            onRetry={fetchUsers}
+            showConfig={error.includes("Firebase configuration is incomplete")}
+          />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout activeLink="users" title="User Management">

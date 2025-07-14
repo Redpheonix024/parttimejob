@@ -56,6 +56,7 @@ const nextConfig = {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
   },
   webpack: (config, { dev, isServer, webpack }) => {
     if (dev && !isServer) {
@@ -73,7 +74,38 @@ const nextConfig = {
         aggregateTimeout: 300,
         ignored: ['**/.git/**', '**/node_modules/**', '**/.next/**']
       };
+
+      // Improve chunk splitting for better HMR
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        cacheGroups: {
+          default: false,
+          vendors: false,
+          // Create a vendor chunk for better caching
+          vendor: {
+            name: 'vendor',
+            chunks: 'all',
+            test: /node_modules/,
+            priority: 20,
+          },
+          // Create a common chunk for shared code
+          common: {
+            name: 'common',
+            minChunks: 2,
+            chunks: 'all',
+            priority: 10,
+            reuseExistingChunk: true,
+            enforce: true,
+          },
+        },
+      };
     }
+
+    // Add better chunk naming for easier debugging
+    config.output.chunkFilename = dev 
+      ? 'static/chunks/[name].[chunkhash].js'
+      : 'static/chunks/[name].[contenthash].js';
+
     return config;
   },
 

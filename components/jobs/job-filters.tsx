@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { SimpleSelect } from "@/components/ui/simple-select"
 import { Filter, Search } from "lucide-react"
 
 interface JobFiltersProps {
@@ -34,26 +34,26 @@ export default function JobFilters({
         />
       </div>
       <div className="flex gap-4">
-        <Select value={locationFilter} onValueChange={onLocationChange}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Location" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="anywhere">Anywhere</SelectItem>
-            <SelectItem value="remote">Remote Only</SelectItem>
-            <SelectItem value="local">Local Only</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={sortBy} onValueChange={onSortChange}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="newest">Newest</SelectItem>
-            <SelectItem value="salary">Highest Pay</SelectItem>
-            <SelectItem value="duration">Duration</SelectItem>
-          </SelectContent>
-        </Select>
+        <SimpleSelect 
+          value={locationFilter} 
+          onValueChange={onLocationChange}
+          placeholder="Location"
+          className="w-[160px]"
+        >
+          <option value="anywhere">Anywhere</option>
+          <option value="remote">Remote Only</option>
+          <option value="local">Local Only</option>
+        </SimpleSelect>
+        <SimpleSelect 
+          value={sortBy} 
+          onValueChange={onSortChange}
+          placeholder="Sort by"
+          className="w-[160px]"
+        >
+          <option value="newest">Newest</option>
+          <option value="salary">Highest Pay</option>
+          <option value="duration">Duration</option>
+        </SimpleSelect>
         <Button variant="outline" className="flex items-center gap-2">
           <Filter className="h-4 w-4" />
           <span className="hidden md:inline">More Filters</span>

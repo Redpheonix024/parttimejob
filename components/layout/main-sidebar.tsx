@@ -3,7 +3,7 @@
 import type React from "react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   Home,
   Search,
@@ -53,6 +53,7 @@ export default function MainSidebar({
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetContent side="left" className="p-0 w-[280px]">
+        <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <div className="flex flex-col h-full">
           <div className="p-4 border-b">
             <Link

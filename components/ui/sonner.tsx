@@ -1,12 +1,28 @@
 "use client"
 
-import { useTheme } from "next-themes"
+import { useEffect, useState } from "react"
 import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
+// Safe theme hook
+function useSafeTheme() {
+  const [theme, setTheme] = useState<string>("system");
+
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem("theme") || "system";
+      setTheme(savedTheme);
+    } catch (error) {
+      console.warn("Could not get theme from localStorage:", error);
+    }
+  }, []);
+
+  return theme;
+}
+
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  const theme = useSafeTheme();
 
   return (
     <Sonner

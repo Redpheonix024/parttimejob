@@ -4,7 +4,7 @@ import type React from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { SimpleSelect } from "@/components/ui/simple-select"
 import { Search } from "lucide-react"
 
 interface JobSearchFormProps {
@@ -32,16 +32,11 @@ export default function JobSearchForm({ onSubmit, className = "" }: JobSearchFor
           <Input name="query" placeholder="Job title, keywords, or company" className="pl-10" />
         </div>
         <div>
-          <Select name="location">
-            <SelectTrigger>
-              <SelectValue placeholder="Location" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="anywhere">Anywhere</SelectItem>
-              <SelectItem value="remote">Remote Only</SelectItem>
-              <SelectItem value="local">Local Only</SelectItem>
-            </SelectContent>
-          </Select>
+          <SimpleSelect name="location" placeholder="Location">
+            <option value="anywhere">Anywhere</option>
+            <option value="remote">Remote Only</option>
+            <option value="local">Local Only</option>
+          </SimpleSelect>
         </div>
         <Button type="submit" className="w-full">
           Search Jobs

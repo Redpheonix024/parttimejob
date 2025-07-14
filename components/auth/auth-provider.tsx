@@ -16,6 +16,11 @@ export default function AuthProvider({
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      // Skip authentication checks in development mode for easier testing
+      if (process.env.NODE_ENV === 'development' && pathname === '/') {
+        return;
+      }
+
       // Public paths that don't require authentication
       const publicPaths = ["/", "/login", "/register"];
       

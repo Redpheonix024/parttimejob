@@ -1,8 +1,39 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { usersApi } from '../utils/api';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/app/config/firebase';
+import { getFirebaseDb } from '@/utils/firebase-client';
+
+// Safe Firebase initialization
+const initializeFirebase = async () => {
+  try {
+    const { initializeApp, getApps } = await import("firebase/app");
+    const { getFirestore } = await import("firebase/firestore");
+    
+    const firebaseConfig = {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+      measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+    };
+
+    // Check if config is valid
+    if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+      console.warn("Firebase configuration is incomplete");
+      return null;
+    }
+
+    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    const db = getFirestore(app);
+    
+    return { db };
+  } catch (error) {
+    console.error("Failed to initialize Firebase:", error);
+    return null;
+  }
+};
 
 export function useUserProfile() {
   const { user } = useAuth();
@@ -19,7 +50,15 @@ export function useUserProfile() {
   const fetchUserProfile = async (userId: string) => {
     try {
       setLoading(true);
+      
+      const db = await getFirebaseDb();
+      if (!db) {
+        setError("Firebase not available");
+        return;
+      }
+
       // Fetch user data directly from Firestore
+      const { doc, getDoc } = await import("firebase/firestore");
       const userDocRef = doc(db, "users", userId);
       const userDoc = await getDoc(userDocRef);
       

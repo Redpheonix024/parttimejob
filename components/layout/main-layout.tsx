@@ -7,6 +7,7 @@ import Footer from "@/components/layout/footer"
 import MainSidebar from "@/components/layout/main-sidebar"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { useAuth } from "@/hooks/useAuth"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -30,27 +31,29 @@ export default function MainLayout({ children, showNav = true, activeLink }: Mai
   };
   
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Header 
-        key={refreshKey} 
-        showNav={showNav} 
-        activeLink={activeLink} 
-        userData={profile || {}} 
-        toggleMobileSidebar={toggleMobileSidebar}
-      />
-      
-      {/* Mobile sidebar that only renders for logged-in users */}
-      <MainSidebar 
-        activeLink={activeLink}
-        isOpen={mobileSidebarOpen}
-        setIsOpen={setMobileSidebarOpen}
-        userData={profile}
-        user={user}
-      />
-      
-      <main className="flex-1">{children}</main>
-      <Footer />
-    </div>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-background flex flex-col">
+        <Header 
+          key={refreshKey} 
+          showNav={showNav} 
+          activeLink={activeLink} 
+          userData={profile || {}} 
+          toggleMobileSidebar={toggleMobileSidebar}
+        />
+        
+        {/* Mobile sidebar that only renders for logged-in users */}
+        <MainSidebar 
+          activeLink={activeLink}
+          isOpen={mobileSidebarOpen}
+          setIsOpen={setMobileSidebarOpen}
+          userData={profile}
+          user={user}
+        />
+        
+        <main className="flex-1">{children}</main>
+        <Footer />
+      </div>
+    </ErrorBoundary>
   )
 }
 
