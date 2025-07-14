@@ -780,7 +780,10 @@ export default function AuthPage() {
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
           <p>
             &copy; {new Date().getFullYear()} part time jobs. All rights
-            reserved.
+            reserved. |{' '}
+            <Link href="/admin/login" className="hover:underline">
+              Admin Login
+            </Link>
           </p>
         </div>
       </footer>
