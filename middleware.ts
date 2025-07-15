@@ -15,6 +15,8 @@ const PUBLIC_PATHS = [
   "/register",
   "/admin/login",
   "/admin/forgot-password",
+  "/about",
+  "/how-it-works",
 ];
 
 export function middleware(request: NextRequest) {

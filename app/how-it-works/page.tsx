@@ -11,7 +11,7 @@ import {
   UserPlus,
   Search,
 } from "lucide-react";
-import { RupeeIcon } from "@/components/ui/rupee-icon"
+import { RupeeIcon } from "@/components/ui/rupee-icon";
 
 export default function HowItWorks() {
   return (
@@ -39,9 +39,6 @@ export default function HowItWorks() {
             </Link>
           </nav>
           <div className="flex items-center gap-4">
-            <Link href="/post-job">
-              <Button>Post a Job</Button>
-            </Link>
             <Link href="/login" className="hidden md:block">
               <Button variant="outline">Sign In</Button>
             </Link>
@@ -210,13 +207,8 @@ export default function HowItWorks() {
                     </h2>
                     <p className="text-muted-foreground mb-6">
                       Parttimejob connects you with qualified candidates for
-                      your part-time positions or short-term projects. Post a
-                      job and start receiving applications from interested
-                      candidates within minutes.
+                      your part-time positions or short-term projects.
                     </p>
-                    <Link href="/post-job">
-                      <Button>Post a Job</Button>
-                    </Link>
                   </div>
                   <div>
                     <Image
@@ -401,14 +393,6 @@ export default function HowItWorks() {
             <div>
               <h3 className="text-lg font-semibold mb-4">For Employers</h3>
               <ul className="space-y-2 text-sm">
-                <li>
-                  <Link
-                    href="/post-job"
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    Post a Job
-                  </Link>
-                </li>
                 <li>
                   <Link
                     href="/how-it-works?tab=employers"

@@ -22,7 +22,7 @@ export default function AuthProvider({
       }
 
       // Public paths that don't require authentication
-      const publicPaths = ["/", "/login", "/register"];
+      const publicPaths = ["/", "/login", "/register", "/about", "/how-it-works"];
       
       // Check if path is a job details page
       const isJobDetailsPage = pathname.startsWith("/jobs/");

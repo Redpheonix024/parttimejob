@@ -30,9 +30,6 @@ export default function About() {
             </Link>
           </nav>
           <div className="flex items-center gap-4">
-            <Link href="/post-job">
-              <Button>Post a Job</Button>
-            </Link>
             <Link href="/login" className="hidden md:block">
               <Button variant="outline">Sign In</Button>
             </Link>

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { getRelativeTime } from "@/utils/relative-time";
 import { useSSERefresh } from "@/hooks/useSSERefresh";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // Define constants for job counts
 const INITIAL_JOB_LOAD = 6;
